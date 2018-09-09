@@ -22,10 +22,16 @@ const lookup = (variable, map, lookupFn = identity, defaultValue) => Object
     ''
   ) + defaultValue
 
+const reduce = (pineReducerFunctionName, initialValue, array) => array.reduce(
+  (acc, value) => `${pineReducerFunctionName}(${acc}, ${value})`,
+  initialValue
+)
+
 export {
   comment,
   string,
   listItem,
   list,
-  lookup
+  lookup,
+  reduce
 }
