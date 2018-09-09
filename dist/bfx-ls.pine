@@ -1,0 +1,323 @@
+
+//@version=3
+study("Bitfinex Longs/Shorts {v2} [m59]", shorttitle="BFX L/S", precision=2)
+
+// 
+// This script was generated from https://github.com/m59peacemaker/pine-bfx-ls
+// 
+// ----- DESCRIPTION
+// 
+// This indicator offers comprehensive views of the Bitfinex margin position data.
+// See the options for various ways to render this indicator to get the view of this data you're looking for.
+// You may also want to click the indicator's title with the downward triangle/arrow
+// and select "Move To -> Existing Pane Above" to overlay the indicator with the price.
+// 
+// * A note on "resolve_error". READ THIS!
+// "resolve_error" is normal and expected, depending on how you're using the indicator.
+// By default, the indicator will try to find data by using the base and quote (pair) of the chart you are on.
+// You can change the data in the indicator settings by choosing a different base and/or quote.
+// You can change the denomination of the displayed data as well.
+// Not all bases, quotes, and denominations are compatible.
+// If you get "resolve_error",
+// you're either on an unsupported chart using the default settings
+// or you've manually selected an incompatible configuration of base/quote/denomination.
+// 
+// 
+// ----- PRINTED VALUES
+// 
+// RENDERED VALUES
+// 
+// Rendered Value 1 | Rendered Value 2 | Zero Line
+// 
+// 
+// CUMULATIVE VALUES
+// 
+// Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
+// 
+// 
+// LOOKBACK DELTA VALUES
+// The last set of printed values is the differences of the cumulative value of the printed data types from the values a number of bars ago.
+// See the "Print Delta Lookback Length" option.
+// 
+// Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
+// 
+// 
+// ----- OPTIONS
+// 
+// - Data Type: Select which type of data to render.
+//   - Buys: A long entering is a buy and a short exiting is a buy.
+//   - Buys/Sells: Both buys and sells.
+//   - Longs
+//   - Longs (Net): Longs subtracted by shorts (longs - shorts).
+//       It rises when more longs enter than shorts enter and falls when more shorts enter than longs enter,
+//       so rising means traders are going more long and falling means traders are going more short.
+//   - Longs (Percent): The percent of long positions of the total positions (longs / (longs + shorts)).
+//   - Longs/Shorts: Both longs and shorts.
+//   - Open Interest: The total value of longs and shorts - the total amount of BTC in all margin positions.
+//   - Shorts
+//   - Sells: A short entering is a sell and a long exiting is a sell.
+// 
+//   - Data Format:
+//   - Cumulative: Render the cumulative (running total) of the data.
+//   - Delta: Render the change from previous cumulative value to current cumulative value of the data.
+//   - Gain: Render the positive delta only.
+//   - Loss: Render the negative delta only.
+// 
+//   * A note on Buys and Sells
+//       The data from which all other values are dervived is the cumulative value of longs and cumulative value of shorts.
+//       Imagine if all longs and shorts in the market exited, and at the same time, the same amount of longs and shorts entered the market.
+//       That would be many positions closing and many opening,
+//       yet this signficant change could not be indicated because the total amount of longs and amount of shorts would remain the same.
+//       Therefore, Buys and Sells cannot be precise.
+//       We know if longs are greater than before and/or shorts are less than before, that at least that number of buys occurred and that can be indicated.
+//       We would not know how many buys and sells occurred as some longs and shorts exited and new longs and shorts entered in their place.
+// 
+// - Base: The base of the pair (BTC is the base of the BTCUSD pair).
+//   - This Base: use the base of the current chart
+// 
+// - Quote: The quote of the pair (USD is the base of the BTCUSD pair).
+//   - This Quote: use the quote of the current chart
+// 
+// - Denomination:
+//     The denomination by which the data is measured.
+//     This defaults to the base value.
+//     For example, if you're viewing the BTCUSD pair, BTC is the base, so by default, the data will be displayed as a measure of BTC.
+//     If there were 10,000 BTC of long positions, long positions will be represented as 10,000.
+//     In that case, if you change the denomination to "USD", and BTCUSD is $6000 USD, long positions would be displayed as 60,000,000 (10,0000 * 6000).
+//   - Base: Use the selected base value (default)
+//   - Quote: Use the selected quote value
+// 
+// - Print Delta Lookback Length:
+//     The change of all indicated values from the current bar number back to the "Lookback Length" bar number is calculated and printed.
+//     I frequently look at two points of the various data presented by this indicator and have to calculate the difference manually.
+//     With this built-in calculator, you can use the TradingView Measure tool to measure the distance between two points (i.e. "-20 bars")
+//     and enter that distance (i.e. "20") to see the difference automatically calculated and printed.
+// 
+// 
+// ---- INTERPRETATION
+// 
+// See the excellent material by Bitcoin Trading Challenge on YouTube: https://www.youtube.com/playlist?list=PLMiIpkr6T9nWbkNzRjcBYVNSC4HmhPSY-
+// 
+
+
+//----- INPUTS
+
+dataType = input(
+   "Longs (Percent)",
+   title="Data Source",
+   options=[
+     "Buys",
+     "Buys/Sells",
+     "Longs",
+     "Longs (Net)",
+     "Longs (Percent)",
+     "Longs/Shorts",
+     "Open Interest",
+     "Sells",
+     "Shorts"])
+
+DATA_TYPE_BUYS = "Buys"
+DATA_TYPE_BUYS_SELLS = "Buys/Sells"
+DATA_TYPE_LONGS = "Longs"
+DATA_TYPE_LONGS_NET = "Longs (Net)"
+DATA_TYPE_LONGS_PERCENT = "Longs (Percent)"
+DATA_TYPE_LONGS_SHORTS = "Longs/Shorts"
+DATA_TYPE_OPEN_INTEREST = "Open Interest"
+DATA_TYPE_SELLS = "Sells"
+DATA_TYPE_SHORTS = "Shorts"
+
+dataFormat = input("Cumulative", title="Data Format", options=[ "Cumulative", "Delta", "Gain", "Loss" ])
+
+DATA_FORMAT_CUMULATIVE = "Cumulative"
+DATA_FORMAT_DELTA = "Delta"
+DATA_FORMAT_GAIN = "Gain"
+DATA_FORMAT_LOSS = "Loss"
+
+baseSelected = input(
+   "*This Base",
+   title="Base",
+   options=[ "*This Base", "ABS", "AGI", "AID", "AIO", "ANT", "ATM", "AUC", "AVT", "BAT", "BBN", "BCH", "BCI", "BFT", "BNT", "BTC", "BTG", "CBT", "CFI", "CND", "CTX", "DAD", "DAI", "DASH", "DATA", "DGX", "DTA", "DTH", "EDO", "ELF", "EOS", "ESS", "ETC", "ETH", "ETP", "FSN", "FUN", "GNT", "GOT", "HOT", "IOS", "IOTA", "IQX", "KNC", "LRC", "LTC", "LYM", "MAN", "MIT", "MKR", "MNA", "MTN", "NCA", "NEO", "NIO", "ODE", "OMG", "ORS", "PAI", "POA", "POY", "QASH", "QTUM", "RCN", "RDN", "REP", "REQ", "RLC", "RRT", "SAN", "SEE", "SEN", "SNG", "SNT", "SPK", "STJ", "TKN", "TNB", "TRX", "UTK", "UTN", "VEE", "VET", "WAX", "WPR", "XLM", "XMR", "XRA", "XRP", "XVG", "YYW", "ZCN", "ZEC", "ZIL", "ZRX" ])
+
+quoteSelected = input(
+   "*This Quote",
+   title="Quote",
+   options=[ "*This Quote", "BTC", "EOS", "ETH", "EUR", "GBP", "JPY", "USD" ])
+
+denominationSelected = input(
+   "*Base",
+   title="Denomination",
+   options=[ "*Base", "*Quote", "BTC", "ETH", "EUR", "GBP", "JPY", "USD" ])
+
+printDeltaLookbackLength = input(1, title="Print Delta Lookback Length")
+
+
+//----- HELPERS
+
+gain (value) => max(change(value), 0)
+
+loss (value) => abs(min(change(value), 0))
+
+chooseDataByFormat (format, cumulative, delta, gain, loss) =>
+   (format == DATA_FORMAT_CUMULATIVE
+     ? cumulative
+     : (format == DATA_FORMAT_DELTA
+       ? delta
+       : (format == DATA_FORMAT_GAIN
+         ? gain
+         : (format == DATA_FORMAT_LOSS
+           ? loss
+           : na))))
+
+getClose (ticker) => security(ticker, period, close)
+
+getMarginData (base, quote) =>
+    pair = base + quote
+    [ getClose(pair + "LONGS"), getClose(pair + "SHORTS") ]
+
+getBase (tkr) => tkr == "XBTUSD" ? "BTC" : tkr == "BTCEUR" ? "BTC" : tkr == "BTCJPY" ? "BTC" : tkr == "BTCGBP" ? "BTC" : tkr == "BTCUSD" ? "BTC" : tkr == "ETHEUR" ? "ETH" : tkr == "ETHJPY" ? "ETH" : tkr == "ETHGBP" ? "ETH" : tkr == "ETHUSD" ? "ETH" : tkr == "ETHBTC" ? "ETH" : tkr == "EOSEUR" ? "EOS" : tkr == "EOSJPY" ? "EOS" : tkr == "EOSGBP" ? "EOS" : tkr == "EOSUSD" ? "EOS" : tkr == "EOSBTC" ? "EOS" : tkr == "EOSETH" ? "EOS" : tkr == "LTCUSD" ? "LTC" : tkr == "LTCBTC" ? "LTC" : tkr == "XRPUSD" ? "XRP" : tkr == "XRPBTC" ? "XRP" : tkr == "BCHUSD" ? "BCH" : tkr == "BCHBTC" ? "BCH" : tkr == "BCHETH" ? "BCH" : tkr == "IOTAEUR" ? "IOTA" : tkr == "IOTAJPY" ? "IOTA" : tkr == "IOTAGBP" ? "IOTA" : tkr == "IOTAUSD" ? "IOTA" : tkr == "IOTABTC" ? "IOTA" : tkr == "IOTAETH" ? "IOTA" : tkr == "NEOEUR" ? "NEO" : tkr == "NEOJPY" ? "NEO" : tkr == "NEOGBP" ? "NEO" : tkr == "NEOUSD" ? "NEO" : tkr == "NEOBTC" ? "NEO" : tkr == "NEOETH" ? "NEO" : tkr == "ETCUSD" ? "ETC" : tkr == "ETCBTC" ? "ETC" : tkr == "OMGUSD" ? "OMG" : tkr == "OMGBTC" ? "OMG" : tkr == "OMGETH" ? "OMG" : tkr == "XMRUSD" ? "XMR" : tkr == "XMRBTC" ? "XMR" : tkr == "DASHUSD" ? "DASH" : tkr == "DASHBTC" ? "DASH" : tkr == "TRXUSD" ? "TRX" : tkr == "TRXBTC" ? "TRX" : tkr == "TRXETH" ? "TRX" : tkr == "ZECUSD" ? "ZEC" : tkr == "ZECBTC" ? "ZEC" : tkr == "BTGUSD" ? "BTG" : tkr == "BTGBTC" ? "BTG" : tkr == "SANUSD" ? "SAN" : tkr == "SANBTC" ? "SAN" : tkr == "SANETH" ? "SAN" : tkr == "ZRXUSD" ? "ZRX" : tkr == "ZRXBTC" ? "ZRX" : tkr == "ZRXETH" ? "ZRX" : tkr == "EDOUSD" ? "EDO" : tkr == "EDOBTC" ? "EDO" : tkr == "EDOETH" ? "EDO" : tkr == "ETPUSD" ? "ETP" : tkr == "ETPBTC" ? "ETP" : tkr == "ETPETH" ? "ETP" : tkr == "QTUMUSD" ? "QTUM" : tkr == "QTUMBTC" ? "QTUM" : tkr == "QTUMETH" ? "QTUM" : tkr == "BATUSD" ? "BAT" : tkr == "BATBTC" ? "BAT" : tkr == "BATETH" ? "BAT" : tkr == "SNTUSD" ? "SNT" : tkr == "SNTBTC" ? "SNT" : tkr == "SNTETH" ? "SNT" : tkr == "AIDUSD" ? "AID" : tkr == "AIDBTC" ? "AID" : tkr == "AIDETH" ? "AID" : tkr == "REPUSD" ? "REP" : tkr == "REPBTC" ? "REP" : tkr == "REPETH" ? "REP" : tkr == "QASHUSD" ? "QASH" : tkr == "QASHBTC" ? "QASH" : tkr == "QASHETH" ? "QASH" : tkr == "YYWUSD" ? "YYW" : tkr == "YYWBTC" ? "YYW" : tkr == "YYWETH" ? "YYW" : tkr == "DATAUSD" ? "DATA" : tkr == "DATABTC" ? "DATA" : tkr == "DATAETH" ? "DATA" : tkr == "GNTUSD" ? "GNT" : tkr == "GNTBTC" ? "GNT" : tkr == "GNTETH" ? "GNT" : tkr == "TNBUSD" ? "TNB" : tkr == "TNBBTC" ? "TNB" : tkr == "TNBETH" ? "TNB" : tkr == "FUNUSD" ? "FUN" : tkr == "FUNBTC" ? "FUN" : tkr == "FUNETH" ? "FUN" : tkr == "SPKUSD" ? "SPK" : tkr == "SPKBTC" ? "SPK" : tkr == "SPKETH" ? "SPK" : tkr == "RLCUSD" ? "RLC" : tkr == "RLCBTC" ? "RLC" : tkr == "RLCETH" ? "RLC" : tkr == "ELFUSD" ? "ELF" : tkr == "ELFBTC" ? "ELF" : tkr == "ELFETH" ? "ELF" : tkr == "AVTUSD" ? "AVT" : tkr == "AVTBTC" ? "AVT" : tkr == "AVTETH" ? "AVT" : tkr == "MNAUSD" ? "MNA" : tkr == "MNABTC" ? "MNA" : tkr == "MNAETH" ? "MNA" : tkr == "RCNUSD" ? "RCN" : tkr == "RCNBTC" ? "RCN" : tkr == "RCNETH" ? "RCN" : tkr == "SNGUSD" ? "SNG" : tkr == "SNGBTC" ? "SNG" : tkr == "SNGETH" ? "SNG" : tkr == "RRTUSD" ? "RRT" : tkr == "RRTBTC" ? "RRT" : tkr == "IOSUSD" ? "IOS" : tkr == "IOSBTC" ? "IOS" : tkr == "IOSETH" ? "IOS" : tkr == "AIOUSD" ? "AIO" : tkr == "AIOBTC" ? "AIO" : tkr == "AIOETH" ? "AIO" : tkr == "REQUSD" ? "REQ" : tkr == "REQBTC" ? "REQ" : tkr == "REQETH" ? "REQ" : tkr == "RDNUSD" ? "RDN" : tkr == "RDNBTC" ? "RDN" : tkr == "RDNETH" ? "RDN" : tkr == "LRCUSD" ? "LRC" : tkr == "LRCBTC" ? "LRC" : tkr == "LRCETH" ? "LRC" : tkr == "WAXUSD" ? "WAX" : tkr == "WAXBTC" ? "WAX" : tkr == "WAXETH" ? "WAX" : tkr == "DAIUSD" ? "DAI" : tkr == "DAIBTC" ? "DAI" : tkr == "DAIETH" ? "DAI" : tkr == "CFIUSD" ? "CFI" : tkr == "CFIBTC" ? "CFI" : tkr == "CFIETH" ? "CFI" : tkr == "AGIUSD" ? "AGI" : tkr == "AGIBTC" ? "AGI" : tkr == "AGIETH" ? "AGI" : tkr == "BFTUSD" ? "BFT" : tkr == "BFTBTC" ? "BFT" : tkr == "BFTETH" ? "BFT" : tkr == "MTNUSD" ? "MTN" : tkr == "MTNBTC" ? "MTN" : tkr == "MTNETH" ? "MTN" : tkr == "ODEUSD" ? "ODE" : tkr == "ODEBTC" ? "ODE" : tkr == "ODEETH" ? "ODE" : tkr == "ANTUSD" ? "ANT" : tkr == "ANTBTC" ? "ANT" : tkr == "ANTETH" ? "ANT" : tkr == "DTHUSD" ? "DTH" : tkr == "DTHBTC" ? "DTH" : tkr == "DTHETH" ? "DTH" : tkr == "MITUSD" ? "MIT" : tkr == "MITBTC" ? "MIT" : tkr == "MITETH" ? "MIT" : tkr == "STJUSD" ? "STJ" : tkr == "STJBTC" ? "STJ" : tkr == "STJETH" ? "STJ" : tkr == "XLMUSD" ? "XLM" : tkr == "XLMEUR" ? "XLM" : tkr == "XLMJPY" ? "XLM" : tkr == "XLMGBP" ? "XLM" : tkr == "XLMBTC" ? "XLM" : tkr == "XLMETH" ? "XLM" : tkr == "XVGUSD" ? "XVG" : tkr == "XVGEUR" ? "XVG" : tkr == "XVGJPY" ? "XVG" : tkr == "XVGGBP" ? "XVG" : tkr == "XVGBTC" ? "XVG" : tkr == "XVGETH" ? "XVG" : tkr == "BCIUSD" ? "BCI" : tkr == "BCIBTC" ? "BCI" : tkr == "MKRUSD" ? "MKR" : tkr == "MKRBTC" ? "MKR" : tkr == "MKRETH" ? "MKR" : tkr == "KNCUSD" ? "KNC" : tkr == "KNCBTC" ? "KNC" : tkr == "KNCETH" ? "KNC" : tkr == "POAUSD" ? "POA" : tkr == "POABTC" ? "POA" : tkr == "POAETH" ? "POA" : tkr == "LYMUSD" ? "LYM" : tkr == "LYMBTC" ? "LYM" : tkr == "LYMETH" ? "LYM" : tkr == "UTKUSD" ? "UTK" : tkr == "UTKBTC" ? "UTK" : tkr == "UTKETH" ? "UTK" : tkr == "VEEUSD" ? "VEE" : tkr == "VEEBTC" ? "VEE" : tkr == "VEEETH" ? "VEE" : tkr == "DADUSD" ? "DAD" : tkr == "DADBTC" ? "DAD" : tkr == "DADETH" ? "DAD" : tkr == "ORSUSD" ? "ORS" : tkr == "ORSBTC" ? "ORS" : tkr == "ORSETH" ? "ORS" : tkr == "AUCUSD" ? "AUC" : tkr == "AUCBTC" ? "AUC" : tkr == "AUCETH" ? "AUC" : tkr == "POYUSD" ? "POY" : tkr == "POYBTC" ? "POY" : tkr == "POYETH" ? "POY" : tkr == "FSNUSD" ? "FSN" : tkr == "FSNBTC" ? "FSN" : tkr == "FSNETH" ? "FSN" : tkr == "CBTUSD" ? "CBT" : tkr == "CBTBTC" ? "CBT" : tkr == "CBTETH" ? "CBT" : tkr == "ZCNUSD" ? "ZCN" : tkr == "ZCNBTC" ? "ZCN" : tkr == "ZCNETH" ? "ZCN" : tkr == "SENUSD" ? "SEN" : tkr == "SENBTC" ? "SEN" : tkr == "SENETH" ? "SEN" : tkr == "NCAUSD" ? "NCA" : tkr == "NCABTC" ? "NCA" : tkr == "NCAETH" ? "NCA" : tkr == "CNDUSD" ? "CND" : tkr == "CNDBTC" ? "CND" : tkr == "CNDETH" ? "CND" : tkr == "CTXUSD" ? "CTX" : tkr == "CTXBTC" ? "CTX" : tkr == "CTXETH" ? "CTX" : tkr == "PAIUSD" ? "PAI" : tkr == "PAIBTC" ? "PAI" : tkr == "SEEUSD" ? "SEE" : tkr == "SEEBTC" ? "SEE" : tkr == "SEEETH" ? "SEE" : tkr == "ESSUSD" ? "ESS" : tkr == "ESSBTC" ? "ESS" : tkr == "ESSETH" ? "ESS" : tkr == "ATMUSD" ? "ATM" : tkr == "ATMBTC" ? "ATM" : tkr == "ATMETH" ? "ATM" : tkr == "HOTUSD" ? "HOT" : tkr == "HOTBTC" ? "HOT" : tkr == "HOTETH" ? "HOT" : tkr == "DTAUSD" ? "DTA" : tkr == "DTABTC" ? "DTA" : tkr == "DTAETH" ? "DTA" : tkr == "IQXUSD" ? "IQX" : tkr == "IQXBTC" ? "IQX" : tkr == "IQXEOS" ? "IQX" : tkr == "WPRUSD" ? "WPR" : tkr == "WPRBTC" ? "WPR" : tkr == "WPRETH" ? "WPR" : tkr == "ZILUSD" ? "ZIL" : tkr == "ZILBTC" ? "ZIL" : tkr == "ZILETH" ? "ZIL" : tkr == "BNTUSD" ? "BNT" : tkr == "BNTBTC" ? "BNT" : tkr == "BNTETH" ? "BNT" : tkr == "ABSUSD" ? "ABS" : tkr == "ABSETH" ? "ABS" : tkr == "XRAUSD" ? "XRA" : tkr == "XRAETH" ? "XRA" : tkr == "MANUSD" ? "MAN" : tkr == "MANETH" ? "MAN" : tkr == "BBNUSD" ? "BBN" : tkr == "BBNETH" ? "BBN" : tkr == "NIOUSD" ? "NIO" : tkr == "NIOETH" ? "NIO" : tkr == "DGXUSD" ? "DGX" : tkr == "DGXETH" ? "DGX" : tkr == "VETUSD" ? "VET" : tkr == "VETBTC" ? "VET" : tkr == "VETETH" ? "VET" : tkr == "UTNUSD" ? "UTN" : tkr == "UTNETH" ? "UTN" : tkr == "TKNUSD" ? "TKN" : tkr == "TKNETH" ? "TKN" : tkr == "GOTUSD" ? "GOT" : tkr == "GOTEUR" ? "GOT" : tkr == "GOTETH" ? "GOT" : "NA"
+
+getQuote (tkr) => tkr == "XBTUSD" ? "USD" : tkr == "BTCEUR" ? "EUR" : tkr == "BTCJPY" ? "JPY" : tkr == "BTCGBP" ? "GBP" : tkr == "BTCUSD" ? "USD" : tkr == "ETHEUR" ? "EUR" : tkr == "ETHJPY" ? "JPY" : tkr == "ETHGBP" ? "GBP" : tkr == "ETHUSD" ? "USD" : tkr == "ETHBTC" ? "BTC" : tkr == "EOSEUR" ? "EUR" : tkr == "EOSJPY" ? "JPY" : tkr == "EOSGBP" ? "GBP" : tkr == "EOSUSD" ? "USD" : tkr == "EOSBTC" ? "BTC" : tkr == "EOSETH" ? "ETH" : tkr == "LTCUSD" ? "USD" : tkr == "LTCBTC" ? "BTC" : tkr == "XRPUSD" ? "USD" : tkr == "XRPBTC" ? "BTC" : tkr == "BCHUSD" ? "USD" : tkr == "BCHBTC" ? "BTC" : tkr == "BCHETH" ? "ETH" : tkr == "IOTAEUR" ? "EUR" : tkr == "IOTAJPY" ? "JPY" : tkr == "IOTAGBP" ? "GBP" : tkr == "IOTAUSD" ? "USD" : tkr == "IOTABTC" ? "BTC" : tkr == "IOTAETH" ? "ETH" : tkr == "NEOEUR" ? "EUR" : tkr == "NEOJPY" ? "JPY" : tkr == "NEOGBP" ? "GBP" : tkr == "NEOUSD" ? "USD" : tkr == "NEOBTC" ? "BTC" : tkr == "NEOETH" ? "ETH" : tkr == "ETCUSD" ? "USD" : tkr == "ETCBTC" ? "BTC" : tkr == "OMGUSD" ? "USD" : tkr == "OMGBTC" ? "BTC" : tkr == "OMGETH" ? "ETH" : tkr == "XMRUSD" ? "USD" : tkr == "XMRBTC" ? "BTC" : tkr == "DASHUSD" ? "USD" : tkr == "DASHBTC" ? "BTC" : tkr == "TRXUSD" ? "USD" : tkr == "TRXBTC" ? "BTC" : tkr == "TRXETH" ? "ETH" : tkr == "ZECUSD" ? "USD" : tkr == "ZECBTC" ? "BTC" : tkr == "BTGUSD" ? "USD" : tkr == "BTGBTC" ? "BTC" : tkr == "SANUSD" ? "USD" : tkr == "SANBTC" ? "BTC" : tkr == "SANETH" ? "ETH" : tkr == "ZRXUSD" ? "USD" : tkr == "ZRXBTC" ? "BTC" : tkr == "ZRXETH" ? "ETH" : tkr == "EDOUSD" ? "USD" : tkr == "EDOBTC" ? "BTC" : tkr == "EDOETH" ? "ETH" : tkr == "ETPUSD" ? "USD" : tkr == "ETPBTC" ? "BTC" : tkr == "ETPETH" ? "ETH" : tkr == "QTUMUSD" ? "USD" : tkr == "QTUMBTC" ? "BTC" : tkr == "QTUMETH" ? "ETH" : tkr == "BATUSD" ? "USD" : tkr == "BATBTC" ? "BTC" : tkr == "BATETH" ? "ETH" : tkr == "SNTUSD" ? "USD" : tkr == "SNTBTC" ? "BTC" : tkr == "SNTETH" ? "ETH" : tkr == "AIDUSD" ? "USD" : tkr == "AIDBTC" ? "BTC" : tkr == "AIDETH" ? "ETH" : tkr == "REPUSD" ? "USD" : tkr == "REPBTC" ? "BTC" : tkr == "REPETH" ? "ETH" : tkr == "QASHUSD" ? "USD" : tkr == "QASHBTC" ? "BTC" : tkr == "QASHETH" ? "ETH" : tkr == "YYWUSD" ? "USD" : tkr == "YYWBTC" ? "BTC" : tkr == "YYWETH" ? "ETH" : tkr == "DATAUSD" ? "USD" : tkr == "DATABTC" ? "BTC" : tkr == "DATAETH" ? "ETH" : tkr == "GNTUSD" ? "USD" : tkr == "GNTBTC" ? "BTC" : tkr == "GNTETH" ? "ETH" : tkr == "TNBUSD" ? "USD" : tkr == "TNBBTC" ? "BTC" : tkr == "TNBETH" ? "ETH" : tkr == "FUNUSD" ? "USD" : tkr == "FUNBTC" ? "BTC" : tkr == "FUNETH" ? "ETH" : tkr == "SPKUSD" ? "USD" : tkr == "SPKBTC" ? "BTC" : tkr == "SPKETH" ? "ETH" : tkr == "RLCUSD" ? "USD" : tkr == "RLCBTC" ? "BTC" : tkr == "RLCETH" ? "ETH" : tkr == "ELFUSD" ? "USD" : tkr == "ELFBTC" ? "BTC" : tkr == "ELFETH" ? "ETH" : tkr == "AVTUSD" ? "USD" : tkr == "AVTBTC" ? "BTC" : tkr == "AVTETH" ? "ETH" : tkr == "MNAUSD" ? "USD" : tkr == "MNABTC" ? "BTC" : tkr == "MNAETH" ? "ETH" : tkr == "RCNUSD" ? "USD" : tkr == "RCNBTC" ? "BTC" : tkr == "RCNETH" ? "ETH" : tkr == "SNGUSD" ? "USD" : tkr == "SNGBTC" ? "BTC" : tkr == "SNGETH" ? "ETH" : tkr == "RRTUSD" ? "USD" : tkr == "RRTBTC" ? "BTC" : tkr == "IOSUSD" ? "USD" : tkr == "IOSBTC" ? "BTC" : tkr == "IOSETH" ? "ETH" : tkr == "AIOUSD" ? "USD" : tkr == "AIOBTC" ? "BTC" : tkr == "AIOETH" ? "ETH" : tkr == "REQUSD" ? "USD" : tkr == "REQBTC" ? "BTC" : tkr == "REQETH" ? "ETH" : tkr == "RDNUSD" ? "USD" : tkr == "RDNBTC" ? "BTC" : tkr == "RDNETH" ? "ETH" : tkr == "LRCUSD" ? "USD" : tkr == "LRCBTC" ? "BTC" : tkr == "LRCETH" ? "ETH" : tkr == "WAXUSD" ? "USD" : tkr == "WAXBTC" ? "BTC" : tkr == "WAXETH" ? "ETH" : tkr == "DAIUSD" ? "USD" : tkr == "DAIBTC" ? "BTC" : tkr == "DAIETH" ? "ETH" : tkr == "CFIUSD" ? "USD" : tkr == "CFIBTC" ? "BTC" : tkr == "CFIETH" ? "ETH" : tkr == "AGIUSD" ? "USD" : tkr == "AGIBTC" ? "BTC" : tkr == "AGIETH" ? "ETH" : tkr == "BFTUSD" ? "USD" : tkr == "BFTBTC" ? "BTC" : tkr == "BFTETH" ? "ETH" : tkr == "MTNUSD" ? "USD" : tkr == "MTNBTC" ? "BTC" : tkr == "MTNETH" ? "ETH" : tkr == "ODEUSD" ? "USD" : tkr == "ODEBTC" ? "BTC" : tkr == "ODEETH" ? "ETH" : tkr == "ANTUSD" ? "USD" : tkr == "ANTBTC" ? "BTC" : tkr == "ANTETH" ? "ETH" : tkr == "DTHUSD" ? "USD" : tkr == "DTHBTC" ? "BTC" : tkr == "DTHETH" ? "ETH" : tkr == "MITUSD" ? "USD" : tkr == "MITBTC" ? "BTC" : tkr == "MITETH" ? "ETH" : tkr == "STJUSD" ? "USD" : tkr == "STJBTC" ? "BTC" : tkr == "STJETH" ? "ETH" : tkr == "XLMUSD" ? "USD" : tkr == "XLMEUR" ? "EUR" : tkr == "XLMJPY" ? "JPY" : tkr == "XLMGBP" ? "GBP" : tkr == "XLMBTC" ? "BTC" : tkr == "XLMETH" ? "ETH" : tkr == "XVGUSD" ? "USD" : tkr == "XVGEUR" ? "EUR" : tkr == "XVGJPY" ? "JPY" : tkr == "XVGGBP" ? "GBP" : tkr == "XVGBTC" ? "BTC" : tkr == "XVGETH" ? "ETH" : tkr == "BCIUSD" ? "USD" : tkr == "BCIBTC" ? "BTC" : tkr == "MKRUSD" ? "USD" : tkr == "MKRBTC" ? "BTC" : tkr == "MKRETH" ? "ETH" : tkr == "KNCUSD" ? "USD" : tkr == "KNCBTC" ? "BTC" : tkr == "KNCETH" ? "ETH" : tkr == "POAUSD" ? "USD" : tkr == "POABTC" ? "BTC" : tkr == "POAETH" ? "ETH" : tkr == "LYMUSD" ? "USD" : tkr == "LYMBTC" ? "BTC" : tkr == "LYMETH" ? "ETH" : tkr == "UTKUSD" ? "USD" : tkr == "UTKBTC" ? "BTC" : tkr == "UTKETH" ? "ETH" : tkr == "VEEUSD" ? "USD" : tkr == "VEEBTC" ? "BTC" : tkr == "VEEETH" ? "ETH" : tkr == "DADUSD" ? "USD" : tkr == "DADBTC" ? "BTC" : tkr == "DADETH" ? "ETH" : tkr == "ORSUSD" ? "USD" : tkr == "ORSBTC" ? "BTC" : tkr == "ORSETH" ? "ETH" : tkr == "AUCUSD" ? "USD" : tkr == "AUCBTC" ? "BTC" : tkr == "AUCETH" ? "ETH" : tkr == "POYUSD" ? "USD" : tkr == "POYBTC" ? "BTC" : tkr == "POYETH" ? "ETH" : tkr == "FSNUSD" ? "USD" : tkr == "FSNBTC" ? "BTC" : tkr == "FSNETH" ? "ETH" : tkr == "CBTUSD" ? "USD" : tkr == "CBTBTC" ? "BTC" : tkr == "CBTETH" ? "ETH" : tkr == "ZCNUSD" ? "USD" : tkr == "ZCNBTC" ? "BTC" : tkr == "ZCNETH" ? "ETH" : tkr == "SENUSD" ? "USD" : tkr == "SENBTC" ? "BTC" : tkr == "SENETH" ? "ETH" : tkr == "NCAUSD" ? "USD" : tkr == "NCABTC" ? "BTC" : tkr == "NCAETH" ? "ETH" : tkr == "CNDUSD" ? "USD" : tkr == "CNDBTC" ? "BTC" : tkr == "CNDETH" ? "ETH" : tkr == "CTXUSD" ? "USD" : tkr == "CTXBTC" ? "BTC" : tkr == "CTXETH" ? "ETH" : tkr == "PAIUSD" ? "USD" : tkr == "PAIBTC" ? "BTC" : tkr == "SEEUSD" ? "USD" : tkr == "SEEBTC" ? "BTC" : tkr == "SEEETH" ? "ETH" : tkr == "ESSUSD" ? "USD" : tkr == "ESSBTC" ? "BTC" : tkr == "ESSETH" ? "ETH" : tkr == "ATMUSD" ? "USD" : tkr == "ATMBTC" ? "BTC" : tkr == "ATMETH" ? "ETH" : tkr == "HOTUSD" ? "USD" : tkr == "HOTBTC" ? "BTC" : tkr == "HOTETH" ? "ETH" : tkr == "DTAUSD" ? "USD" : tkr == "DTABTC" ? "BTC" : tkr == "DTAETH" ? "ETH" : tkr == "IQXUSD" ? "USD" : tkr == "IQXBTC" ? "BTC" : tkr == "IQXEOS" ? "EOS" : tkr == "WPRUSD" ? "USD" : tkr == "WPRBTC" ? "BTC" : tkr == "WPRETH" ? "ETH" : tkr == "ZILUSD" ? "USD" : tkr == "ZILBTC" ? "BTC" : tkr == "ZILETH" ? "ETH" : tkr == "BNTUSD" ? "USD" : tkr == "BNTBTC" ? "BTC" : tkr == "BNTETH" ? "ETH" : tkr == "ABSUSD" ? "USD" : tkr == "ABSETH" ? "ETH" : tkr == "XRAUSD" ? "USD" : tkr == "XRAETH" ? "ETH" : tkr == "MANUSD" ? "USD" : tkr == "MANETH" ? "ETH" : tkr == "BBNUSD" ? "USD" : tkr == "BBNETH" ? "ETH" : tkr == "NIOUSD" ? "USD" : tkr == "NIOETH" ? "ETH" : tkr == "DGXUSD" ? "USD" : tkr == "DGXETH" ? "ETH" : tkr == "VETUSD" ? "USD" : tkr == "VETBTC" ? "BTC" : tkr == "VETETH" ? "ETH" : tkr == "UTNUSD" ? "USD" : tkr == "UTNETH" ? "ETH" : tkr == "TKNUSD" ? "USD" : tkr == "TKNETH" ? "ETH" : tkr == "GOTUSD" ? "USD" : tkr == "GOTEUR" ? "EUR" : tkr == "GOTETH" ? "ETH" : "NA"
+
+// 
+// The denominating logic is awkward because the security function is busted and won't work with a value that uses ticker in certain ways, such as the following:
+// 
+// t = ticker
+// t2 = t
+// x =  security(true ? t : (t + t2), period, close)
+// plot(x)
+// 
+// The workaround is to put the offending logic into a function and derive the argument for security from that function.
+// 
+
+getDenominationTicker (base, quote) =>
+    denomination = denominationSelected == "*Base" ? base :
+       denominationSelected == "*Quote" ? quote :
+       denominationSelected
+    denomination == base ? "NA" : "BITFINEX:" + base + denomination
+
+denominate (base, quote, value) =>
+    denominationTicker = getDenominationTicker(base, quote)
+    denominationTicker == "NA" ? value : (value * security(denominationTicker, period, close))
+
+
+//----- VALUES
+
+base = baseSelected == "*This Base" ? getBase(ticker) : baseSelected
+
+quote = quoteSelected == "*This Quote" ? getQuote(ticker) : quoteSelected
+
+[ longs_cumulative_base, shorts_cumulative_base ] = getMarginData(base, quote)
+
+longs_cumulative = denominate(base, quote, longs_cumulative_base)
+shorts_cumulative = denominate(base, quote, shorts_cumulative_base)
+
+openInterest_cumulative = longs_cumulative + shorts_cumulative
+longs_net_cumulative = longs_cumulative - shorts_cumulative
+longs_percent_cumulative = (longs_cumulative / openInterest_cumulative) * 100
+
+longs_delta = change(longs_cumulative)
+longs_net_delta = change(longs_net_cumulative)
+longs_percent_delta = change(longs_percent_cumulative)
+openInterest_delta = change(openInterest_cumulative)
+shorts_delta = change(shorts_cumulative)
+
+longs_gain = gain(longs_cumulative)
+longs_net_gain = gain(longs_net_cumulative)
+longs_percent_gain = gain(longs_percent_cumulative)
+openInterest_gain = gain(openInterest_cumulative)
+shorts_gain = gain(shorts_cumulative)
+
+longs_loss = loss(longs_cumulative)
+longs_net_loss = loss(longs_net_cumulative)
+longs_percent_loss = loss(longs_percent_cumulative)
+openInterest_loss = loss(openInterest_cumulative)
+shorts_loss = loss(shorts_cumulative)
+
+buys_gain = longs_gain + shorts_loss
+sells_gain = shorts_gain + longs_loss
+
+buys_loss = na
+sells_loss = na
+
+buys_delta = buys_gain
+sells_delta = sells_gain
+
+buys_cumulative = cum(buys_delta)
+sells_cumulative = cum(sells_delta)
+
+longsPrintDelta = change(longs_cumulative, printDeltaLookbackLength)
+longsNetPrintDelta = change(longs_net_cumulative, printDeltaLookbackLength)
+longsPercentPrintDelta = change(longs_percent_cumulative, printDeltaLookbackLength)
+shortsPrintDelta = change(shorts_cumulative, printDeltaLookbackLength)
+openInterestPrintDelta = change(openInterest_cumulative, printDeltaLookbackLength)
+buysPrintDelta = change(buys_cumulative, printDeltaLookbackLength)
+sellsPrintDelta = change(sells_cumulative, printDeltaLookbackLength)
+
+
+//----- RENDER
+
+renderBuys = (dataType == DATA_TYPE_BUYS) or (dataType == DATA_TYPE_BUYS_SELLS)
+renderLongs = (dataType == DATA_TYPE_LONGS) or (dataType == DATA_TYPE_LONGS_SHORTS)
+renderLongsNet = dataType == DATA_TYPE_LONGS_NET
+renderLongsPercent = dataType == DATA_TYPE_LONGS_PERCENT
+renderOpenInterest = dataType == DATA_TYPE_OPEN_INTEREST
+renderSells = (dataType == DATA_TYPE_SELLS) or (dataType == DATA_TYPE_BUYS_SELLS)
+renderShorts = (dataType == DATA_TYPE_SHORTS) or (dataType == DATA_TYPE_LONGS_SHORTS)
+
+buysRenderValue = chooseDataByFormat(dataFormat, buys_cumulative, buys_delta, buys_gain, -buys_loss)
+longsRenderValue = chooseDataByFormat(dataFormat, longs_cumulative, longs_delta, longs_gain, -longs_loss)
+longsNetRenderValue = chooseDataByFormat(dataFormat, longs_net_cumulative, longs_net_delta, longs_net_gain, -longs_net_loss)
+longsPercentRenderValue = chooseDataByFormat(dataFormat, longs_percent_cumulative, longs_percent_delta, longs_percent_gain, -longs_percent_loss)
+openInterestRenderValue = chooseDataByFormat(dataFormat, openInterest_cumulative, openInterest_delta, openInterest_gain, -openInterest_loss)
+sellsRenderValue = chooseDataByFormat(dataFormat, sells_cumulative, sells_delta, sells_gain, -sells_loss)
+shortsRenderValue = chooseDataByFormat(dataFormat, shorts_cumulative, shorts_delta, shorts_gain, -shorts_loss)
+
+renderValue1 = renderBuys
+   ? buysRenderValue
+   : (renderLongs
+     ? longsRenderValue
+     : (renderLongsNet
+       ? longsNetRenderValue
+       : (renderLongsPercent
+         ? longsPercentRenderValue
+         : (renderOpenInterest
+           ? openInterestRenderValue
+           : na))))
+
+renderValue2 = renderSells
+   ? sellsRenderValue
+   : (renderShorts
+     ? shortsRenderValue
+     : na)
+
+longsColor = #53B987
+shortsColor = #EB4D5C
+openInterestColor = #247BA0
+
+renderColor1 = (renderBuys or renderLongs or renderLongsNet or renderLongsPercent)
+   ? longsColor
+   : (renderOpenInterest
+     ? openInterestColor
+     : na)
+
+renderColor2 = shortsColor
+
+renderZeroLine = (dataFormat == DATA_FORMAT_DELTA)
+
+plot(renderValue1, title="Rendered Value 1", color=renderColor1)
+plot(renderValue2, title="Rendered Value 2", color=renderColor2)
+plot(renderZeroLine ? 0 : na, title="Zero Line", style=circles, color=renderZeroLine ? color(black, 50) : white)
+
+plotshape(longs_cumulative, title="Longs {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(longs_net_cumulative, title="Longs (Net) {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(longs_percent_cumulative, title="Longs (Percent) {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(shorts_cumulative, title="Shorts {Print}", location=location.top, color=shortsColor, transp=100)
+plotshape(openInterest_cumulative, title="Open Interest {Print}", location=location.top, color=openInterestColor, transp=100)
+
+plotshape(0, title="Divider {Print}", location=location.top, color=white, transp=100)
+
+plotshape(longsPrintDelta, title="Longs Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(longsNetPrintDelta, title="Longs (Net) Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(longsPercentPrintDelta, title="Longs (Percent) Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(shortsPrintDelta, title="Shorts Lookback Delta {Print}", location=location.top, color=shortsColor, transp=100)
+plotshape(openInterestPrintDelta, title="Open Interest Lookback Delta {Print}", location=location.top, color=openInterestColor, transp=100)
