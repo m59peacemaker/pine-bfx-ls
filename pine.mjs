@@ -1,9 +1,10 @@
 import { EOL } from 'os'
 
 const identity = v => v
+const spaceIf = condition => condition ? ' ' : ''
 
 const comment = string => string.split(EOL)
-  .map(line => `// ${line}`)
+  .map(line => `//${spaceIf(line.length > 0)}${line}`)
   .join(EOL)
 
 const string = v => `"${v}"`
