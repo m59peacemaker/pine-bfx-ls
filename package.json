@@ -11,6 +11,7 @@
     "type": "git",
     "url": "https://github.com/m59peacemaker/pine-bfx-ls"
   },
+  "bugs": "https://github.com/m59peacemaker/pine-bfx-ls/issues",
   "author": "Johnny Hauser <johnnyhauser@gmail.com>",
   "license": "CC0-1.0",
   "dependencies": {

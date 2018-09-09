@@ -16,6 +16,9 @@ ${pine.comment(
 `
 This script was generated from ${pkg.repository.url}
 
+Issues? ${pkg.bugs}
+
+
 ----- DESCRIPTION
 
 This indicator offers comprehensive views of the Bitfinex margin position data.
