@@ -8,7 +8,7 @@ import * as pine from './pine.mjs'
 
 const { JSDOM } = jsdom
 
-const Script = ({ constants, tickers, baseOptions, quoteOptions, denominationOptions }) => `
+const Script = ({ constants, allPairs, tickers, baseOptions, quoteOptions, denominationOptions }) => `
 //@version=3
 study("Bitfinex Longs/Shorts {v2} [m59]", shorttitle="BFX L/S", precision=2)
 
@@ -214,7 +214,7 @@ getDenominationTicker (base, quote) =>
 
 denominate (base, quote, value) =>
     denominationTicker = getDenominationTicker(base, quote)
-    denominationTicker == "NA" ? value : (value * security(denominationTicker, period, close))
+    denominationTicker == "NA" ? value : (value * getClose(denominationTicker))
 
 
 //----- VALUES
@@ -346,17 +346,19 @@ got('https://www.bitfinex.com/stats#pairs')
     const pairs = [ ...window.document.querySelectorAll('#pairs + table .col-info') ]
       .map(v => v.textContent.split('/'))
       .reduce(
-        ({ tickers, bases, quotes }, [ base, quote ]) => {
+        ({ allPairs, tickers, bases, quotes }, [ base, quote ]) => {
           const ticker = `${base}${quote}`
           tickers[ticker] = { base, quote }
           bases[base] = bases[base] || []
           quotes[quote] = quotes[quote] || []
           bases[base].push(quote)
           quotes[quote].push(base)
-          return { tickers, bases, quotes }
+          allPairs.push(`${base}${quote}`)
+          return { tickers, bases, quotes, allPairs }
         },
-        { tickers: { XBTUSD: { base: 'BTC', quote: 'USD' } }, bases: {}, quotes: {} }
+        { tickers: { XBTUSD: { base: 'BTC', quote: 'USD' } }, bases: {}, quotes: {}, allPairs: [] }
       )
+    const allPairs = pairs.allPairs.sort()
     const bases = Object.keys(pairs.bases).sort()
     const quotes = Object.keys(pairs.quotes).sort()
     const constants = {
@@ -367,11 +369,11 @@ got('https://www.bitfinex.com/stats#pairs')
       DENOMINATIONS_BASE: '*Base',
       DENOMINATIONS_QUOTE: '*Quote'
     }
-    const baseOptions = [ constants.BASES_THIS, /*(constants.BASES_ALL,*/ ...bases ]
-    const quoteOptions = [ constants.QUOTES_THIS, /*constants.QUOTES_ALL,*/ ...quotes ]
+    const baseOptions = [ constants.BASES_THIS, ...bases ]
+    const quoteOptions = [ constants.QUOTES_THIS, ...quotes ]
     const nonDenominationalQuotes = [ 'EOS' ]
     const denominations = quotes.filter(quote => !(nonDenominationalQuotes.includes(quote)))
     const denominationOptions = [ constants.DENOMINATIONS_BASE, constants.DENOMINATIONS_QUOTE, ...denominations ]
-    const script = Script({ constants, tickers: pairs.tickers, baseOptions, quoteOptions, denominationOptions })
+    const script = Script({ constants, allPairs, tickers: pairs.tickers, baseOptions, quoteOptions, denominationOptions })
     process.stdout.write(script)
   })
