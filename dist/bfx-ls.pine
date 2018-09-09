@@ -200,7 +200,7 @@ getDenominationTicker (base, quote) =>
 
 denominate (base, quote, value) =>
     denominationTicker = getDenominationTicker(base, quote)
-    denominationTicker == "NA" ? value : (value * security(denominationTicker, period, close))
+    denominationTicker == "NA" ? value : (value * getClose(denominationTicker))
 
 
 //----- VALUES
