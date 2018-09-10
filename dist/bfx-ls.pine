@@ -90,6 +90,66 @@ study("Bitfinex Longs/Shorts {v2} [m59]", shorttitle="BFX L/S", precision=2)
 //
 // See the excellent material by Bitcoin Trading Challenge on YouTube: https://www.youtube.com/playlist?list=PLMiIpkr6T9nWbkNzRjcBYVNSC4HmhPSY-
 //
+//
+// ----- SUPPORTED PAIRS
+//
+// BCHBTC
+// BCHETH
+// BCHUSD
+// BTCUSD
+// BTCEUR
+// BTCGBP
+// BTCJPY
+// BTGBTC
+// BTGUSD
+// DSHBTC
+// DSHUSD
+// EDOBTC
+// EDOETH
+// EDOUSD
+// EOSBTC
+// EOSETH
+// EOSUSD
+// EOSEUR
+// EOSGBP
+// EOSJPY
+// ETCBTC
+// ETCUSD
+// ETHBTC
+// ETHUSD
+// ETHEUR
+// ETHGBP
+// ETHJPY
+// ETPBTC
+// ETPETH
+// ETPUSD
+// IOTBTC
+// IOTETH
+// IOTUSD
+// IOTEUR
+// IOTGBP
+// IOTJPY
+// LTCBTC
+// LTCUSD
+// NEOBTC
+// NEOETH
+// NEOUSD
+// NEOEUR
+// NEOGBP
+// NEOJPY
+// OMGBTC
+// OMGETH
+// OMGUSD
+// SANBTC
+// SANETH
+// SANUSD
+// XMRBTC
+// XMRUSD
+// XRPBTC
+// XRPUSD
+// ZECBTC
+// ZECUSD
+//
 
 
 //----- INPUTS
@@ -157,9 +217,9 @@ chooseDataByFormat (format, cumulative, delta, gain, loss) =>
 
 getBase (pair) => pair == "BCHBTC" ? "BCH" : pair == "BCHBTCLONGS" ? "BCH" : pair == "BCHBTCSHORTS" ? "BCH" : pair == "BCHETH" ? "BCH" : pair == "BCHETHLONGS" ? "BCH" : pair == "BCHETHSHORTS" ? "BCH" : pair == "BCHUSD" ? "BCH" : pair == "BCHUSDLONGS" ? "BCH" : pair == "BCHUSDSHORTS" ? "BCH" : pair == "BTCUSD" ? "BTC" : pair == "BTCUSDLONGS" ? "BTC" : pair == "BTCUSDSHORTS" ? "BTC" : pair == "XBTUSD" ? "BTC" : pair == "BTCEUR" ? "BTC" : pair == "BTCEURLONGS" ? "BTC" : pair == "BTCEURSHORTS" ? "BTC" : pair == "XBTEUR" ? "BTC" : pair == "BTCGBP" ? "BTC" : pair == "BTCGBPLONGS" ? "BTC" : pair == "BTCGBPSHORTS" ? "BTC" : pair == "XBTGBP" ? "BTC" : pair == "BTCJPY" ? "BTC" : pair == "BTCJPYLONGS" ? "BTC" : pair == "BTCJPYSHORTS" ? "BTC" : pair == "XBTJPY" ? "BTC" : pair == "BTGBTC" ? "BTG" : pair == "BTGBTCLONGS" ? "BTG" : pair == "BTGBTCSHORTS" ? "BTG" : pair == "BTGUSD" ? "BTG" : pair == "BTGUSDLONGS" ? "BTG" : pair == "BTGUSDSHORTS" ? "BTG" : pair == "DSHBTC" ? "DSH" : pair == "DSHBTCLONGS" ? "DSH" : pair == "DSHBTCSHORTS" ? "DSH" : pair == "DASHBTC" ? "DSH" : pair == "DSHUSD" ? "DSH" : pair == "DSHUSDLONGS" ? "DSH" : pair == "DSHUSDSHORTS" ? "DSH" : pair == "DASHUSD" ? "DSH" : pair == "EDOBTC" ? "EDO" : pair == "EDOBTCLONGS" ? "EDO" : pair == "EDOBTCSHORTS" ? "EDO" : pair == "EDOETH" ? "EDO" : pair == "EDOETHLONGS" ? "EDO" : pair == "EDOETHSHORTS" ? "EDO" : pair == "EDOUSD" ? "EDO" : pair == "EDOUSDLONGS" ? "EDO" : pair == "EDOUSDSHORTS" ? "EDO" : pair == "EOSBTC" ? "EOS" : pair == "EOSBTCLONGS" ? "EOS" : pair == "EOSBTCSHORTS" ? "EOS" : pair == "EOSETH" ? "EOS" : pair == "EOSETHLONGS" ? "EOS" : pair == "EOSETHSHORTS" ? "EOS" : pair == "EOSUSD" ? "EOS" : pair == "EOSUSDLONGS" ? "EOS" : pair == "EOSUSDSHORTS" ? "EOS" : pair == "EOSEUR" ? "EOS" : pair == "EOSEURLONGS" ? "EOS" : pair == "EOSEURSHORTS" ? "EOS" : pair == "EOSGBP" ? "EOS" : pair == "EOSGBPLONGS" ? "EOS" : pair == "EOSGBPSHORTS" ? "EOS" : pair == "EOSJPY" ? "EOS" : pair == "EOSJPYLONGS" ? "EOS" : pair == "EOSJPYSHORTS" ? "EOS" : pair == "ETCBTC" ? "ETC" : pair == "ETCBTCLONGS" ? "ETC" : pair == "ETCBTCSHORTS" ? "ETC" : pair == "ETCUSD" ? "ETC" : pair == "ETCUSDLONGS" ? "ETC" : pair == "ETCUSDSHORTS" ? "ETC" : pair == "ETHBTC" ? "ETH" : pair == "ETHBTCLONGS" ? "ETH" : pair == "ETHBTCSHORTS" ? "ETH" : pair == "ETHUSD" ? "ETH" : pair == "ETHUSDLONGS" ? "ETH" : pair == "ETHUSDSHORTS" ? "ETH" : pair == "ETHEUR" ? "ETH" : pair == "ETHEURLONGS" ? "ETH" : pair == "ETHEURSHORTS" ? "ETH" : pair == "ETHGBP" ? "ETH" : pair == "ETHGBPLONGS" ? "ETH" : pair == "ETHGBPSHORTS" ? "ETH" : pair == "ETHJPY" ? "ETH" : pair == "ETHJPYLONGS" ? "ETH" : pair == "ETHJPYSHORTS" ? "ETH" : pair == "ETPBTC" ? "ETP" : pair == "ETPBTCLONGS" ? "ETP" : pair == "ETPBTCSHORTS" ? "ETP" : pair == "ETPETH" ? "ETP" : pair == "ETPETHLONGS" ? "ETP" : pair == "ETPETHSHORTS" ? "ETP" : pair == "ETPUSD" ? "ETP" : pair == "ETPUSDLONGS" ? "ETP" : pair == "ETPUSDSHORTS" ? "ETP" : pair == "IOTBTC" ? "IOT" : pair == "IOTBTCLONGS" ? "IOT" : pair == "IOTBTCSHORTS" ? "IOT" : pair == "IOTABTC" ? "IOT" : pair == "IOTETH" ? "IOT" : pair == "IOTETHLONGS" ? "IOT" : pair == "IOTETHSHORTS" ? "IOT" : pair == "IOTAETH" ? "IOT" : pair == "IOTUSD" ? "IOT" : pair == "IOTUSDLONGS" ? "IOT" : pair == "IOTUSDSHORTS" ? "IOT" : pair == "IOTAUSD" ? "IOT" : pair == "IOTEUR" ? "IOT" : pair == "IOTEURLONGS" ? "IOT" : pair == "IOTEURSHORTS" ? "IOT" : pair == "IOTAEUR" ? "IOT" : pair == "IOTGBP" ? "IOT" : pair == "IOTGBPLONGS" ? "IOT" : pair == "IOTGBPSHORTS" ? "IOT" : pair == "IOTAGBP" ? "IOT" : pair == "IOTJPY" ? "IOT" : pair == "IOTJPYLONGS" ? "IOT" : pair == "IOTJPYSHORTS" ? "IOT" : pair == "IOTAJPY" ? "IOT" : pair == "LTCBTC" ? "LTC" : pair == "LTCBTCLONGS" ? "LTC" : pair == "LTCBTCSHORTS" ? "LTC" : pair == "LTCUSD" ? "LTC" : pair == "LTCUSDLONGS" ? "LTC" : pair == "LTCUSDSHORTS" ? "LTC" : pair == "NEOBTC" ? "NEO" : pair == "NEOBTCLONGS" ? "NEO" : pair == "NEOBTCSHORTS" ? "NEO" : pair == "NEOETH" ? "NEO" : pair == "NEOETHLONGS" ? "NEO" : pair == "NEOETHSHORTS" ? "NEO" : pair == "NEOUSD" ? "NEO" : pair == "NEOUSDLONGS" ? "NEO" : pair == "NEOUSDSHORTS" ? "NEO" : pair == "NEOEUR" ? "NEO" : pair == "NEOEURLONGS" ? "NEO" : pair == "NEOEURSHORTS" ? "NEO" : pair == "NEOGBP" ? "NEO" : pair == "NEOGBPLONGS" ? "NEO" : pair == "NEOGBPSHORTS" ? "NEO" : pair == "NEOJPY" ? "NEO" : pair == "NEOJPYLONGS" ? "NEO" : pair == "NEOJPYSHORTS" ? "NEO" : pair == "OMGBTC" ? "OMG" : pair == "OMGBTCLONGS" ? "OMG" : pair == "OMGBTCSHORTS" ? "OMG" : pair == "OMGETH" ? "OMG" : pair == "OMGETHLONGS" ? "OMG" : pair == "OMGETHSHORTS" ? "OMG" : pair == "OMGUSD" ? "OMG" : pair == "OMGUSDLONGS" ? "OMG" : pair == "OMGUSDSHORTS" ? "OMG" : pair == "SANBTC" ? "SAN" : pair == "SANBTCLONGS" ? "SAN" : pair == "SANBTCSHORTS" ? "SAN" : pair == "SANETH" ? "SAN" : pair == "SANETHLONGS" ? "SAN" : pair == "SANETHSHORTS" ? "SAN" : pair == "SANUSD" ? "SAN" : pair == "SANUSDLONGS" ? "SAN" : pair == "SANUSDSHORTS" ? "SAN" : pair == "XMRBTC" ? "XMR" : pair == "XMRBTCLONGS" ? "XMR" : pair == "XMRBTCSHORTS" ? "XMR" : pair == "XMRUSD" ? "XMR" : pair == "XMRUSDLONGS" ? "XMR" : pair == "XMRUSDSHORTS" ? "XMR" : pair == "XRPBTC" ? "XRP" : pair == "XRPBTCLONGS" ? "XRP" : pair == "XRPBTCSHORTS" ? "XRP" : pair == "XRPUSD" ? "XRP" : pair == "XRPUSDLONGS" ? "XRP" : pair == "XRPUSDSHORTS" ? "XRP" : pair == "ZECBTC" ? "ZEC" : pair == "ZECBTCLONGS" ? "ZEC" : pair == "ZECBTCSHORTS" ? "ZEC" : pair == "ZECUSD" ? "ZEC" : pair == "ZECUSDLONGS" ? "ZEC" : pair == "ZECUSDSHORTS" ? "ZEC" : "NA"
 
-getClose (ticker) => security(ticker, period, close)
+getBfxClose (tkr) => security(tickerid("BITFINEX", tkr), period, close)
 
-getMarginData (pair) => [ getClose(tickerid("BITFINEX", pair + "LONGS")), getClose(pair + "SHORTS") ]
+getMarginData (pair) => [ getBfxClose(pair + "LONGS"), getBfxClose(pair + "SHORTS") ]
 
 //
 // The denominating logic is awkward because the security function is busted and won't work with a value that uses ticker in certain ways, such as the following:
@@ -170,6 +230,8 @@ getMarginData (pair) => [ getClose(tickerid("BITFINEX", pair + "LONGS")), getClo
 // plot(x)
 //
 // The workaround is to put the offending logic into a function and derive the argument for security from that function.
+// Also, pine seems determined to evaluate and execute the security function, even if I only conditionally call it and the condition is not met.
+// I use plceholderTicker just so that unwanted security call will  work rather than crash the indicator.
 //
 
 getDenominationTicker (targetDenomination, currentDenomination) =>
@@ -178,7 +240,7 @@ getDenominationTicker (targetDenomination, currentDenomination) =>
     targetDenomination == "NA" ? placeholderTicker : denominationTicker
 
 denominate (targetDenomination, currentDenomination, value) =>
-    targetDenomination == "NA" ? value : (value * getClose(getDenominationTicker(targetDenomination, currentDenomination)))
+    targetDenomination == "NA" ? value : (value * getBfxClose(getDenominationTicker(targetDenomination, currentDenomination)))
 
 
 //----- VALUES
