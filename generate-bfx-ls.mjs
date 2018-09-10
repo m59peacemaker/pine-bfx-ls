@@ -212,9 +212,9 @@ chooseDataByFormat (format, cumulative, delta, gain, loss) =>
 
 getBase (pair) => ${pine.lookup('pair', supportedTickersMap, ticker => pine.string(ticker.base), pine.string('NA'))}
 
-getClose (ticker) => security(ticker, period, close)
+getBfxClose (tkr) => security(tickerid("BITFINEX", tkr), period, close)
 
-getMarginData (pair) => [ getClose(tickerid("BITFINEX", pair + "LONGS")), getClose(pair + "SHORTS") ]
+getMarginData (pair) => [ getBfxClose(pair + "LONGS"), getBfxClose(pair + "SHORTS") ]
 
 ${pine.comment(
 `
