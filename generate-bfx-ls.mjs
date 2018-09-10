@@ -237,7 +237,7 @@ getDenominationTicker (targetDenomination, currentDenomination) =>
     targetDenomination == "NA" ? placeholderTicker : denominationTicker
 
 denominate (targetDenomination, currentDenomination, value) =>
-    targetDenomination == "NA" ? value : (value * getClose(getDenominationTicker(targetDenomination, currentDenomination)))
+    targetDenomination == "NA" ? value : (value * getBfxClose(getDenominationTicker(targetDenomination, currentDenomination)))
 
 
 //----- VALUES
