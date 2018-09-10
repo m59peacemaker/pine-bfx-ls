@@ -87,11 +87,6 @@ See the "Print Delta Lookback Length" option.
 Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
 
 
------ SUPPORTED PAIRS
-
-${pairs.join(EOL)}
-
-
 ----- OPTIONS
 
 - Data Type: Select which type of data to render.
@@ -143,6 +138,11 @@ ${pairs.join(EOL)}
 ---- INTERPRETATION
 
 See the excellent material by Bitcoin Trading Challenge on YouTube: https://www.youtube.com/playlist?list=PLMiIpkr6T9nWbkNzRjcBYVNSC4HmhPSY-
+
+
+----- SUPPORTED PAIRS
+
+${pairs.join(EOL)}
 `
 )}
 
