@@ -1,14 +1,18 @@
 #!/bin/sh
 ":" //# http://sambal.org/?p=1014 ; exec /usr/bin/env node --experimental-modules "$0" "$@"
 
+import fs from 'fs'
+import path from 'path'
+import { EOL } from 'os'
 import got from 'got'
 import jsdom from 'jsdom'
 import pkg from './package.json'
 import * as pine from './pine.mjs'
 
+const __dirname = path.dirname(new URL(import.meta.url).pathname)
 const { JSDOM } = jsdom
 
-const Script = ({ constants, allPairs, tickers, baseOptions, quoteOptions, denominationOptions }) => `
+const Script = ({ constants, pairOptions, denominationOptions, supportedTickersMap }) => `
 //@version=3
 study("Bitfinex Longs/Shorts {v2} [m59]", shorttitle="BFX L/S", precision=2)
 
@@ -23,18 +27,11 @@ Issues? ${pkg.bugs}
 
 This indicator offers comprehensive views of the Bitfinex margin position data.
 See the options for various ways to render this indicator to get the view of this data you're looking for.
-You may also want to click the indicator's title with the downward triangle/arrow
-and select "Move To -> Existing Pane Above" to overlay the indicator with the price.
 
-* A note on "resolve_error". READ THIS!
-"resolve_error" is normal and expected, depending on how you're using the indicator.
-By default, the indicator will try to find data by using the base and quote (pair) of the chart you are on.
-You can change the data in the indicator settings by choosing a different base and/or quote.
-You can change the denomination of the displayed data as well.
-Not all bases, quotes, and denominations are compatible.
-If you get "resolve_error",
-you're either on an unsupported chart using the default settings
-or you've manually selected an incompatible configuration of base/quote/denomination.
+* Overlaying the indicator
+To overlay the indicator with the main chart,
+click the indicator's title with the downward triangle/arrow and select "Move To -> Existing Pane Above".
+You may also want to select "Scale -> No Scale".
 
 
 ----- PRINTED VALUES
@@ -86,11 +83,8 @@ Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
       We know if longs are greater than before and/or shorts are less than before, that at least that number of buys occurred and that can be indicated.
       We would not know how many buys and sells occurred as some longs and shorts exited and new longs and shorts entered in their place.
 
-- Base: The base of the pair (BTC is the base of the BTCUSD pair).
-  - This Base: use the base of the current chart
-
-- Quote: The quote of the pair (USD is the base of the BTCUSD pair).
-  - This Quote: use the quote of the current chart
+- Pair: The pair for which to get margin data.
+  - This Pair: Use the pair of the current chart
 
 - Denomination:
     The denomination by which the data is measured.
@@ -99,7 +93,6 @@ Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
     If there were 10,000 BTC of long positions, long positions will be represented as 10,000.
     In that case, if you change the denomination to "USD", and BTCUSD is $6000 USD, long positions would be displayed as 60,000,000 (10,0000 * 6000).
   - Base: Use the selected base value (default)
-  - Quote: Use the selected quote value
 
 - Print Delta Lookback Length:
     The change of all indicated values from the current bar number back to the "Lookback Length" bar number is calculated and printed.
@@ -148,18 +141,13 @@ DATA_FORMAT_DELTA = "Delta"
 DATA_FORMAT_GAIN = "Gain"
 DATA_FORMAT_LOSS = "Loss"
 
-baseSelected = input(
-   "${constants.BASES_THIS}",
-   title="Base",
-   options=${pine.list(baseOptions)})
-
-quoteSelected = input(
-   "${constants.QUOTES_THIS}",
-   title="Quote",
-   options=${pine.list(quoteOptions)})
+pairSelected = input(
+   "${pairOptions[0]}",
+   title="Pair",
+   options=${pine.list(pairOptions)})
 
 denominationSelected = input(
-   "${constants.DENOMINATIONS_BASE}",
+   "${denominationOptions[0]}",
    title="Denomination",
    options=${pine.list(denominationOptions)})
 
@@ -183,15 +171,11 @@ chooseDataByFormat (format, cumulative, delta, gain, loss) =>
            ? loss
            : na))))
 
+getBase (pair) => ${pine.lookup('pair', supportedTickersMap, ticker => pine.string(ticker.base), pine.string('NA'))}
+
 getClose (ticker) => security(ticker, period, close)
 
-getMarginData (base, quote) =>
-    pair = base + quote
-    [ getClose(pair + "LONGS"), getClose(pair + "SHORTS") ]
-
-getBase (tkr) => ${pine.lookup('tkr', tickers, ticker => pine.string(ticker.base), pine.string('NA'))}
-
-getQuote (tkr) => ${pine.lookup('tkr', tickers, ticker => pine.string(ticker.quote), pine.string('NA'))}
+getMarginData (pair) => [ getClose(tickerid("BITFINEX", pair + "LONGS")), getClose(pair + "SHORTS") ]
 
 ${pine.comment(
 `
@@ -206,27 +190,26 @@ The workaround is to put the offending logic into a function and derive the argu
 `
 )}
 
-getDenominationTicker (base, quote) =>
-    denomination = denominationSelected == "${constants.DENOMINATIONS_BASE}" ? base :
-       denominationSelected == "${constants.DENOMINATIONS_QUOTE}" ? quote :
-       denominationSelected
-    denomination == base ? "NA" : "BITFINEX:" + base + denomination
+getDenominationTicker (targetDenomination, currentDenomination) =>
+    placeholderTicker = "BTCUSD"
+    denominationTicker = currentDenomination + targetDenomination
+    targetDenomination == "NA" ? placeholderTicker : denominationTicker
 
-denominate (base, quote, value) =>
-    denominationTicker = getDenominationTicker(base, quote)
-    denominationTicker == "NA" ? value : (value * getClose(denominationTicker))
+denominate (targetDenomination, currentDenomination, value) =>
+    targetDenomination == "NA" ? value : (value * getClose(getDenominationTicker(targetDenomination, currentDenomination)))
 
 
 //----- VALUES
 
-base = baseSelected == "${constants.BASES_THIS}" ? getBase(ticker) : baseSelected
+pairSource = pairSelected == "${constants.PAIRS_THIS}" ? ticker : pairSelected
+pair = ${pine.lookup('pairSource', supportedTickersMap, ticker => pine.string(ticker.pair), pine.string('NA'))}
+base = getBase(pair)
+denomination = denominationSelected == "${constants.DENOMINATIONS_BASE}" ? "NA" : denominationSelected
 
-quote = quoteSelected == "${constants.QUOTES_THIS}" ? getQuote(ticker) : quoteSelected
+[ longs_cumulative_base, shorts_cumulative_base ] = getMarginData(pair)
 
-[ longs_cumulative_base, shorts_cumulative_base ] = getMarginData(base, quote)
-
-longs_cumulative = denominate(base, quote, longs_cumulative_base)
-shorts_cumulative = denominate(base, quote, shorts_cumulative_base)
+longs_cumulative = denominate(denomination, base, longs_cumulative_base)
+shorts_cumulative = denominate(denomination, base, shorts_cumulative_base)
 
 openInterest_cumulative = longs_cumulative + shorts_cumulative
 longs_net_cumulative = longs_cumulative - shorts_cumulative
@@ -340,40 +323,35 @@ plotshape(shortsPrintDelta, title="Shorts Lookback Delta {Print}", location=loca
 plotshape(openInterestPrintDelta, title="Open Interest Lookback Delta {Print}", location=location.top, color=openInterestColor, transp=100)
 `
 
-got('https://www.bitfinex.com/stats#pairs')
-  .then(({ body }) => {
-    const { window } = new JSDOM(body)
-    const pairs = [ ...window.document.querySelectorAll('#pairs + table .col-info') ]
-      .map(v => v.textContent.split('/'))
-      .reduce(
-        ({ allPairs, tickers, bases, quotes }, [ base, quote ]) => {
-          const ticker = `${base}${quote}`
-          tickers[ticker] = { base, quote }
-          bases[base] = bases[base] || []
-          quotes[quote] = quotes[quote] || []
-          bases[base].push(quote)
-          quotes[quote].push(base)
-          allPairs.push(`${base}${quote}`)
-          return { tickers, bases, quotes, allPairs }
-        },
-        { tickers: { XBTUSD: { base: 'BTC', quote: 'USD' } }, bases: {}, quotes: {}, allPairs: [] }
-      )
-    const allPairs = pairs.allPairs.sort()
-    const bases = Object.keys(pairs.bases).sort()
-    const quotes = Object.keys(pairs.quotes).sort()
-    const constants = {
-      BASES_THIS: '*This Base',
-      BASES_ALL: '*All Bases',
-      QUOTES_THIS: '*This Quote',
-      QUOTES_ALL: '*All Quotes',
-      DENOMINATIONS_BASE: '*Base',
-      DENOMINATIONS_QUOTE: '*Quote'
-    }
-    const baseOptions = [ constants.BASES_THIS, ...bases ]
-    const quoteOptions = [ constants.QUOTES_THIS, ...quotes ]
-    const nonDenominationalQuotes = [ 'EOS' ]
-    const denominations = quotes.filter(quote => !(nonDenominationalQuotes.includes(quote)))
-    const denominationOptions = [ constants.DENOMINATIONS_BASE, constants.DENOMINATIONS_QUOTE, ...denominations ]
-    const script = Script({ constants, allPairs, tickers: pairs.tickers, baseOptions, quoteOptions, denominationOptions })
-    process.stdout.write(script)
-  })
+const denominations = [ 'BTC', 'USD' ]
+const baseAliasMap = {
+  BTC: 'XBT',
+  IOT: 'IOTA',
+  DSH: 'DASH'
+}
+const pairs = fs.readFileSync(`${__dirname}/pairs`, 'utf8')
+  .split(EOL)
+  .filter(v => v.length)
+const supportedTickersMap = pairs
+  .map(pair => ({ pair, base: pair.slice(0, 3), quote: pair.slice(3) }))
+  .reduce(
+    (map, { pair, base, quote }) => {
+      const parsedPair = { pair, base, quote }
+      map[pair] = parsedPair
+      map[pair + 'LONGS'] = parsedPair
+      map[pair + 'SHORTS'] = parsedPair
+      if (baseAliasMap[base]) {
+        map[baseAliasMap[base] + quote] = parsedPair
+      }
+      return map
+    },
+    {}
+  )
+const constants = {
+  PAIRS_THIS: '*This Pair',
+  DENOMINATIONS_BASE: '*Base'
+}
+const pairOptions = [ constants.PAIRS_THIS, ...pairs ]
+const denominationOptions = [ constants.DENOMINATIONS_BASE, ...denominations ]
+const script = Script({ constants, pairOptions, denominationOptions, supportedTickersMap })
+process.stdout.write(script)
