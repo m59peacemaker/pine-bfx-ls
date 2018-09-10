@@ -9,7 +9,44 @@ import * as pine from './pine.mjs'
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname)
 
-const Script = ({ constants, pairOptions, denominationOptions, supportedTickersMap }) => `
+const denominations = [ 'BTC', 'USD' ]
+
+const baseAliasMap = {
+  BTC: 'XBT',
+  IOT: 'IOTA',
+  DSH: 'DASH'
+}
+
+const constants = {
+  PAIRS_THIS: '*This Pair',
+  DENOMINATIONS_BASE: '*Base'
+}
+
+const pairs = fs.readFileSync(`${__dirname}/pairs`, 'utf8')
+  .split(EOL)
+  .filter(v => v.length)
+
+const supportedTickersMap = pairs
+  .map(pair => ({ pair, base: pair.slice(0, 3), quote: pair.slice(3) }))
+  .reduce(
+    (map, { pair, base, quote }) => {
+      const parsedPair = { pair, base, quote }
+      map[pair] = parsedPair
+      map[pair + 'LONGS'] = parsedPair
+      map[pair + 'SHORTS'] = parsedPair
+      if (baseAliasMap[base]) {
+        map[baseAliasMap[base] + quote] = parsedPair
+      }
+      return map
+    },
+    {}
+  )
+
+const pairOptions = [ constants.PAIRS_THIS, ...pairs ]
+
+const denominationOptions = [ constants.DENOMINATIONS_BASE, ...denominations ]
+
+const script = `
 //@version=3
 study("Bitfinex Longs/Shorts {v2} [m59]", shorttitle="BFX L/S", precision=2)
 
@@ -48,6 +85,11 @@ The last set of printed values is the differences of the cumulative value of the
 See the "Print Delta Lookback Length" option.
 
 Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
+
+
+----- SUPPORTED PAIRS
+
+${pairs.join(EOL)}
 
 
 ----- OPTIONS
@@ -184,6 +226,8 @@ x =  security(true ? t : (t + t2), period, close)
 plot(x)
 
 The workaround is to put the offending logic into a function and derive the argument for security from that function.
+Also, pine seems determined to evaluate and execute the security function, even if I only conditionally call it and the condition is not met.
+I use plceholderTicker just so that unwanted security call will  work rather than crash the indicator.
 `
 )}
 
@@ -320,35 +364,4 @@ plotshape(shortsPrintDelta, title="Shorts Lookback Delta {Print}", location=loca
 plotshape(openInterestPrintDelta, title="Open Interest Lookback Delta {Print}", location=location.top, color=openInterestColor, transp=100)
 `
 
-const denominations = [ 'BTC', 'USD' ]
-const baseAliasMap = {
-  BTC: 'XBT',
-  IOT: 'IOTA',
-  DSH: 'DASH'
-}
-const pairs = fs.readFileSync(`${__dirname}/pairs`, 'utf8')
-  .split(EOL)
-  .filter(v => v.length)
-const supportedTickersMap = pairs
-  .map(pair => ({ pair, base: pair.slice(0, 3), quote: pair.slice(3) }))
-  .reduce(
-    (map, { pair, base, quote }) => {
-      const parsedPair = { pair, base, quote }
-      map[pair] = parsedPair
-      map[pair + 'LONGS'] = parsedPair
-      map[pair + 'SHORTS'] = parsedPair
-      if (baseAliasMap[base]) {
-        map[baseAliasMap[base] + quote] = parsedPair
-      }
-      return map
-    },
-    {}
-  )
-const constants = {
-  PAIRS_THIS: '*This Pair',
-  DENOMINATIONS_BASE: '*Base'
-}
-const pairOptions = [ constants.PAIRS_THIS, ...pairs ]
-const denominationOptions = [ constants.DENOMINATIONS_BASE, ...denominations ]
-const script = Script({ constants, pairOptions, denominationOptions, supportedTickersMap })
 process.stdout.write(script)
