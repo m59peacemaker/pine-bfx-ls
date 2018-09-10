@@ -4,13 +4,10 @@
 import fs from 'fs'
 import path from 'path'
 import { EOL } from 'os'
-import got from 'got'
-import jsdom from 'jsdom'
 import pkg from './package.json'
 import * as pine from './pine.mjs'
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname)
-const { JSDOM } = jsdom
 
 const Script = ({ constants, pairOptions, denominationOptions, supportedTickersMap }) => `
 //@version=3

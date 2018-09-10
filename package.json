@@ -14,8 +14,5 @@
   "bugs": "https://github.com/m59peacemaker/pine-bfx-ls/issues",
   "author": "Johnny Hauser <johnnyhauser@gmail.com>",
   "license": "CC0-1.0",
-  "dependencies": {
-    "got": "^9.2.1",
-    "jsdom": "^12.0.0"
-  }
+  "dependencies": {}
 }
