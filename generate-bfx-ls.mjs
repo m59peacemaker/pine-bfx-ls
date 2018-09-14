@@ -247,10 +247,7 @@ pair = ${pine.lookup('pairSource', supportedTickersMap, ticker => pine.string(ti
 base = getBase(pair)
 denomination = denominationSelected == "${constants.DENOMINATIONS_BASE}" ? "NA" : denominationSelected
 
-[ longs_cumulative_base, shorts_cumulative_base ] = getMarginData(pair)
-
-longs_cumulative = denominate(denomination, base, longs_cumulative_base)
-shorts_cumulative = denominate(denomination, base, shorts_cumulative_base)
+[ longs_cumulative, shorts_cumulative ] = getMarginData(pair)
 
 openInterest_cumulative = longs_cumulative + shorts_cumulative
 longs_net_cumulative = longs_cumulative - shorts_cumulative
@@ -330,6 +327,9 @@ renderValue2 = renderSells
    : (renderShorts
      ? shortsRenderValue
      : na)
+
+renderValue1 := denominate(denomination, base, renderValue1)
+renderValue2 := denominate(denomination, base, renderValue2)
 
 longsColor = #53B987
 shortsColor = #EB4D5C
