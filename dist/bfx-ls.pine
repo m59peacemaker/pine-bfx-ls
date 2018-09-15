@@ -28,14 +28,14 @@ study("Bitfinex Longs/Shorts {v2} [m59]", shorttitle="BFX L/S", precision=2)
 //
 // CUMULATIVE VALUES
 //
-// Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
+// Longs (Percent) | Longs (Net) | Longs | Shorts | Open Interest
 //
 //
 // LOOKBACK DELTA VALUES
 // The last set of printed values is the differences of the cumulative value of the printed data types from the values a number of bars ago.
 // See the "Print Delta Lookback Length" option.
 //
-// Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
+// Longs (Percent) | Longs (Net) | Longs | Shorts | Open Interest
 //
 //
 // ----- OPTIONS
@@ -71,13 +71,15 @@ study("Bitfinex Longs/Shorts {v2} [m59]", shorttitle="BFX L/S", precision=2)
 // - Pair: The pair for which to get margin data.
 //   - This Pair: Use the pair of the current chart
 //
+// - Aggregate Data: Use additional L/S data.
+//   - Matching Base: Use L/S data that has the same base currency as the currently selected pair i.e. BTCUSD with Matching Base will also include BTCEUR, BTCGBP, and BTCJPY.
+//
 // - Denomination:
 //     The denomination by which the data is measured.
 //     This defaults to the base value.
 //     For example, if you're viewing the BTCUSD pair, BTC is the base, so by default, the data will be displayed as a measure of BTC.
 //     If there were 10,000 BTC of long positions, long positions will be represented as 10,000.
-//     In that case, if you change the denomination to "USD", and BTCUSD is $6000 USD, long positions would be displayed as 60,000,000 (10,0000 * 6000).
-//   - Base: Use the selected base value (default)
+//     In that case, if you change the denomination to "in USD", and BTCUSD is $6000 USD, long positions would be displayed as 60,000,000 (10,0000 * 6000).
 //
 // - Print Delta Lookback Length:
 //     The change of all indicated values from the current bar number back to the "Lookback Length" bar number is calculated and printed.
@@ -154,6 +156,9 @@ study("Bitfinex Longs/Shorts {v2} [m59]", shorttitle="BFX L/S", precision=2)
 
 //----- INPUTS
 
+// I use placeholderTicker to prevent unused security calls from crashing the indicator.
+placeholderTicker = "BTCUSD"
+
 dataType = input(
    "Longs (Percent)",
    title="Data Source",
@@ -190,10 +195,15 @@ pairSelected = input(
    title="Pair",
    options=[ "*This Pair", "BCHBTC", "BCHETH", "BCHUSD", "BTCUSD", "BTCEUR", "BTCGBP", "BTCJPY", "BTGBTC", "BTGUSD", "DSHBTC", "DSHUSD", "EDOBTC", "EDOETH", "EDOUSD", "EOSBTC", "EOSETH", "EOSUSD", "EOSEUR", "EOSGBP", "EOSJPY", "ETCBTC", "ETCUSD", "ETHBTC", "ETHUSD", "ETHEUR", "ETHGBP", "ETHJPY", "ETPBTC", "ETPETH", "ETPUSD", "IOTBTC", "IOTETH", "IOTUSD", "IOTEUR", "IOTGBP", "IOTJPY", "LTCBTC", "LTCUSD", "NEOBTC", "NEOETH", "NEOUSD", "NEOEUR", "NEOGBP", "NEOJPY", "OMGBTC", "OMGETH", "OMGUSD", "SANBTC", "SANETH", "SANUSD", "XMRBTC", "XMRUSD", "XRPBTC", "XRPUSD", "ZECBTC", "ZECUSD" ])
 
+aggregateData = input(
+   "*",
+   title="Aggregate Data",
+   options=[ "*", "Matching Base" ])
+
 denominationSelected = input(
-   "*Base",
+   "*in Base",
    title="Denomination",
-   options=[ "*Base", "BTC", "USD" ])
+   options=[ "*in Base", "in BTC", "in USD" ])
 
 printDeltaLookbackLength = input(1, title="Print Delta Lookback Length")
 
@@ -219,7 +229,34 @@ getBase (pair) => pair == "BCHBTC" ? "BCH" : pair == "BCHBTCLONGS" ? "BCH" : pai
 
 getBfxClose (tkr) => security(tickerid("BITFINEX", tkr), period, close)
 
-getMarginData (pair) => [ getBfxClose(pair + "LONGS"), getBfxClose(pair + "SHORTS") ]
+getLongsData (pair) => getBfxClose(pair + "LONGS")
+getShortsData (pair) => getBfxClose(pair + "SHORTS")
+
+// Generate a function for each quote currency, which will return 0 if called with a base the quote does not support.
+// This gives me a sane starting point to ensure there are not too many calls to security in the script. The limit is 40.
+getLongsData_quote_BTC (base) => (base == "BCH" or base == "BTG" or base == "DSH" or base == "EDO" or base == "EOS" or base == "ETC" or base == "ETH" or base == "ETP" or base == "IOT" or base == "LTC" or base == "NEO" or base == "OMG" or base == "SAN" or base == "XMR" or base == "XRP" or base == "ZEC") ? nz(getLongsData((base == "BCH" or base == "BTG" or base == "DSH" or base == "EDO" or base == "EOS" or base == "ETC" or base == "ETH" or base == "ETP" or base == "IOT" or base == "LTC" or base == "NEO" or base == "OMG" or base == "SAN" or base == "XMR" or base == "XRP" or base == "ZEC") ? base + "BTC" : placeholderTicker), 0) : 0
+getShortsData_quote_BTC (base) => (base == "BCH" or base == "BTG" or base == "DSH" or base == "EDO" or base == "EOS" or base == "ETC" or base == "ETH" or base == "ETP" or base == "IOT" or base == "LTC" or base == "NEO" or base == "OMG" or base == "SAN" or base == "XMR" or base == "XRP" or base == "ZEC") ? nz(getShortsData((base == "BCH" or base == "BTG" or base == "DSH" or base == "EDO" or base == "EOS" or base == "ETC" or base == "ETH" or base == "ETP" or base == "IOT" or base == "LTC" or base == "NEO" or base == "OMG" or base == "SAN" or base == "XMR" or base == "XRP" or base == "ZEC") ? base + "BTC" : placeholderTicker), 0) : 0
+getLongsData_quote_ETH (base) => (base == "BCH" or base == "EDO" or base == "EOS" or base == "ETP" or base == "IOT" or base == "NEO" or base == "OMG" or base == "SAN") ? nz(getLongsData((base == "BCH" or base == "EDO" or base == "EOS" or base == "ETP" or base == "IOT" or base == "NEO" or base == "OMG" or base == "SAN") ? base + "ETH" : placeholderTicker), 0) : 0
+getShortsData_quote_ETH (base) => (base == "BCH" or base == "EDO" or base == "EOS" or base == "ETP" or base == "IOT" or base == "NEO" or base == "OMG" or base == "SAN") ? nz(getShortsData((base == "BCH" or base == "EDO" or base == "EOS" or base == "ETP" or base == "IOT" or base == "NEO" or base == "OMG" or base == "SAN") ? base + "ETH" : placeholderTicker), 0) : 0
+getLongsData_quote_USD (base) => (base == "BCH" or base == "BTC" or base == "BTG" or base == "DSH" or base == "EDO" or base == "EOS" or base == "ETC" or base == "ETH" or base == "ETP" or base == "IOT" or base == "LTC" or base == "NEO" or base == "OMG" or base == "SAN" or base == "XMR" or base == "XRP" or base == "ZEC") ? nz(getLongsData((base == "BCH" or base == "BTC" or base == "BTG" or base == "DSH" or base == "EDO" or base == "EOS" or base == "ETC" or base == "ETH" or base == "ETP" or base == "IOT" or base == "LTC" or base == "NEO" or base == "OMG" or base == "SAN" or base == "XMR" or base == "XRP" or base == "ZEC") ? base + "USD" : placeholderTicker), 0) : 0
+getShortsData_quote_USD (base) => (base == "BCH" or base == "BTC" or base == "BTG" or base == "DSH" or base == "EDO" or base == "EOS" or base == "ETC" or base == "ETH" or base == "ETP" or base == "IOT" or base == "LTC" or base == "NEO" or base == "OMG" or base == "SAN" or base == "XMR" or base == "XRP" or base == "ZEC") ? nz(getShortsData((base == "BCH" or base == "BTC" or base == "BTG" or base == "DSH" or base == "EDO" or base == "EOS" or base == "ETC" or base == "ETH" or base == "ETP" or base == "IOT" or base == "LTC" or base == "NEO" or base == "OMG" or base == "SAN" or base == "XMR" or base == "XRP" or base == "ZEC") ? base + "USD" : placeholderTicker), 0) : 0
+getLongsData_quote_EUR (base) => (base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? nz(getLongsData((base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? base + "EUR" : placeholderTicker), 0) : 0
+getShortsData_quote_EUR (base) => (base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? nz(getShortsData((base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? base + "EUR" : placeholderTicker), 0) : 0
+getLongsData_quote_GBP (base) => (base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? nz(getLongsData((base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? base + "GBP" : placeholderTicker), 0) : 0
+getShortsData_quote_GBP (base) => (base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? nz(getShortsData((base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? base + "GBP" : placeholderTicker), 0) : 0
+getLongsData_quote_JPY (base) => (base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? nz(getLongsData((base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? base + "JPY" : placeholderTicker), 0) : 0
+getShortsData_quote_JPY (base) => (base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? nz(getShortsData((base == "BTC" or base == "EOS" or base == "ETH" or base == "IOT" or base == "NEO") ? base + "JPY" : placeholderTicker), 0) : 0
+
+getAggregatedLongsDataMatchingBase (base) => getLongsData_quote_BTC(base) + getLongsData_quote_ETH(base) + getLongsData_quote_USD(base) + getLongsData_quote_EUR(base) + getLongsData_quote_GBP(base) + getLongsData_quote_JPY(base)
+
+getAggregatedShortsDataMatchingBase (base) => getShortsData_quote_BTC(base) + getShortsData_quote_ETH(base) + getShortsData_quote_USD(base) + getShortsData_quote_EUR(base) + getShortsData_quote_GBP(base) + getShortsData_quote_JPY(base)
+
+//----- VALUES
+
+aggregateMatchingBase = aggregateData == "Matching Base"
+pairSource = pairSelected == "*This Pair" ? ticker : pairSelected
+pair = pairSource == "BCHBTC" ? "BCHBTC" : pairSource == "BCHBTCLONGS" ? "BCHBTC" : pairSource == "BCHBTCSHORTS" ? "BCHBTC" : pairSource == "BCHETH" ? "BCHETH" : pairSource == "BCHETHLONGS" ? "BCHETH" : pairSource == "BCHETHSHORTS" ? "BCHETH" : pairSource == "BCHUSD" ? "BCHUSD" : pairSource == "BCHUSDLONGS" ? "BCHUSD" : pairSource == "BCHUSDSHORTS" ? "BCHUSD" : pairSource == "BTCUSD" ? "BTCUSD" : pairSource == "BTCUSDLONGS" ? "BTCUSD" : pairSource == "BTCUSDSHORTS" ? "BTCUSD" : pairSource == "XBTUSD" ? "BTCUSD" : pairSource == "BTCEUR" ? "BTCEUR" : pairSource == "BTCEURLONGS" ? "BTCEUR" : pairSource == "BTCEURSHORTS" ? "BTCEUR" : pairSource == "XBTEUR" ? "BTCEUR" : pairSource == "BTCGBP" ? "BTCGBP" : pairSource == "BTCGBPLONGS" ? "BTCGBP" : pairSource == "BTCGBPSHORTS" ? "BTCGBP" : pairSource == "XBTGBP" ? "BTCGBP" : pairSource == "BTCJPY" ? "BTCJPY" : pairSource == "BTCJPYLONGS" ? "BTCJPY" : pairSource == "BTCJPYSHORTS" ? "BTCJPY" : pairSource == "XBTJPY" ? "BTCJPY" : pairSource == "BTGBTC" ? "BTGBTC" : pairSource == "BTGBTCLONGS" ? "BTGBTC" : pairSource == "BTGBTCSHORTS" ? "BTGBTC" : pairSource == "BTGUSD" ? "BTGUSD" : pairSource == "BTGUSDLONGS" ? "BTGUSD" : pairSource == "BTGUSDSHORTS" ? "BTGUSD" : pairSource == "DSHBTC" ? "DSHBTC" : pairSource == "DSHBTCLONGS" ? "DSHBTC" : pairSource == "DSHBTCSHORTS" ? "DSHBTC" : pairSource == "DASHBTC" ? "DSHBTC" : pairSource == "DSHUSD" ? "DSHUSD" : pairSource == "DSHUSDLONGS" ? "DSHUSD" : pairSource == "DSHUSDSHORTS" ? "DSHUSD" : pairSource == "DASHUSD" ? "DSHUSD" : pairSource == "EDOBTC" ? "EDOBTC" : pairSource == "EDOBTCLONGS" ? "EDOBTC" : pairSource == "EDOBTCSHORTS" ? "EDOBTC" : pairSource == "EDOETH" ? "EDOETH" : pairSource == "EDOETHLONGS" ? "EDOETH" : pairSource == "EDOETHSHORTS" ? "EDOETH" : pairSource == "EDOUSD" ? "EDOUSD" : pairSource == "EDOUSDLONGS" ? "EDOUSD" : pairSource == "EDOUSDSHORTS" ? "EDOUSD" : pairSource == "EOSBTC" ? "EOSBTC" : pairSource == "EOSBTCLONGS" ? "EOSBTC" : pairSource == "EOSBTCSHORTS" ? "EOSBTC" : pairSource == "EOSETH" ? "EOSETH" : pairSource == "EOSETHLONGS" ? "EOSETH" : pairSource == "EOSETHSHORTS" ? "EOSETH" : pairSource == "EOSUSD" ? "EOSUSD" : pairSource == "EOSUSDLONGS" ? "EOSUSD" : pairSource == "EOSUSDSHORTS" ? "EOSUSD" : pairSource == "EOSEUR" ? "EOSEUR" : pairSource == "EOSEURLONGS" ? "EOSEUR" : pairSource == "EOSEURSHORTS" ? "EOSEUR" : pairSource == "EOSGBP" ? "EOSGBP" : pairSource == "EOSGBPLONGS" ? "EOSGBP" : pairSource == "EOSGBPSHORTS" ? "EOSGBP" : pairSource == "EOSJPY" ? "EOSJPY" : pairSource == "EOSJPYLONGS" ? "EOSJPY" : pairSource == "EOSJPYSHORTS" ? "EOSJPY" : pairSource == "ETCBTC" ? "ETCBTC" : pairSource == "ETCBTCLONGS" ? "ETCBTC" : pairSource == "ETCBTCSHORTS" ? "ETCBTC" : pairSource == "ETCUSD" ? "ETCUSD" : pairSource == "ETCUSDLONGS" ? "ETCUSD" : pairSource == "ETCUSDSHORTS" ? "ETCUSD" : pairSource == "ETHBTC" ? "ETHBTC" : pairSource == "ETHBTCLONGS" ? "ETHBTC" : pairSource == "ETHBTCSHORTS" ? "ETHBTC" : pairSource == "ETHUSD" ? "ETHUSD" : pairSource == "ETHUSDLONGS" ? "ETHUSD" : pairSource == "ETHUSDSHORTS" ? "ETHUSD" : pairSource == "ETHEUR" ? "ETHEUR" : pairSource == "ETHEURLONGS" ? "ETHEUR" : pairSource == "ETHEURSHORTS" ? "ETHEUR" : pairSource == "ETHGBP" ? "ETHGBP" : pairSource == "ETHGBPLONGS" ? "ETHGBP" : pairSource == "ETHGBPSHORTS" ? "ETHGBP" : pairSource == "ETHJPY" ? "ETHJPY" : pairSource == "ETHJPYLONGS" ? "ETHJPY" : pairSource == "ETHJPYSHORTS" ? "ETHJPY" : pairSource == "ETPBTC" ? "ETPBTC" : pairSource == "ETPBTCLONGS" ? "ETPBTC" : pairSource == "ETPBTCSHORTS" ? "ETPBTC" : pairSource == "ETPETH" ? "ETPETH" : pairSource == "ETPETHLONGS" ? "ETPETH" : pairSource == "ETPETHSHORTS" ? "ETPETH" : pairSource == "ETPUSD" ? "ETPUSD" : pairSource == "ETPUSDLONGS" ? "ETPUSD" : pairSource == "ETPUSDSHORTS" ? "ETPUSD" : pairSource == "IOTBTC" ? "IOTBTC" : pairSource == "IOTBTCLONGS" ? "IOTBTC" : pairSource == "IOTBTCSHORTS" ? "IOTBTC" : pairSource == "IOTABTC" ? "IOTBTC" : pairSource == "IOTETH" ? "IOTETH" : pairSource == "IOTETHLONGS" ? "IOTETH" : pairSource == "IOTETHSHORTS" ? "IOTETH" : pairSource == "IOTAETH" ? "IOTETH" : pairSource == "IOTUSD" ? "IOTUSD" : pairSource == "IOTUSDLONGS" ? "IOTUSD" : pairSource == "IOTUSDSHORTS" ? "IOTUSD" : pairSource == "IOTAUSD" ? "IOTUSD" : pairSource == "IOTEUR" ? "IOTEUR" : pairSource == "IOTEURLONGS" ? "IOTEUR" : pairSource == "IOTEURSHORTS" ? "IOTEUR" : pairSource == "IOTAEUR" ? "IOTEUR" : pairSource == "IOTGBP" ? "IOTGBP" : pairSource == "IOTGBPLONGS" ? "IOTGBP" : pairSource == "IOTGBPSHORTS" ? "IOTGBP" : pairSource == "IOTAGBP" ? "IOTGBP" : pairSource == "IOTJPY" ? "IOTJPY" : pairSource == "IOTJPYLONGS" ? "IOTJPY" : pairSource == "IOTJPYSHORTS" ? "IOTJPY" : pairSource == "IOTAJPY" ? "IOTJPY" : pairSource == "LTCBTC" ? "LTCBTC" : pairSource == "LTCBTCLONGS" ? "LTCBTC" : pairSource == "LTCBTCSHORTS" ? "LTCBTC" : pairSource == "LTCUSD" ? "LTCUSD" : pairSource == "LTCUSDLONGS" ? "LTCUSD" : pairSource == "LTCUSDSHORTS" ? "LTCUSD" : pairSource == "NEOBTC" ? "NEOBTC" : pairSource == "NEOBTCLONGS" ? "NEOBTC" : pairSource == "NEOBTCSHORTS" ? "NEOBTC" : pairSource == "NEOETH" ? "NEOETH" : pairSource == "NEOETHLONGS" ? "NEOETH" : pairSource == "NEOETHSHORTS" ? "NEOETH" : pairSource == "NEOUSD" ? "NEOUSD" : pairSource == "NEOUSDLONGS" ? "NEOUSD" : pairSource == "NEOUSDSHORTS" ? "NEOUSD" : pairSource == "NEOEUR" ? "NEOEUR" : pairSource == "NEOEURLONGS" ? "NEOEUR" : pairSource == "NEOEURSHORTS" ? "NEOEUR" : pairSource == "NEOGBP" ? "NEOGBP" : pairSource == "NEOGBPLONGS" ? "NEOGBP" : pairSource == "NEOGBPSHORTS" ? "NEOGBP" : pairSource == "NEOJPY" ? "NEOJPY" : pairSource == "NEOJPYLONGS" ? "NEOJPY" : pairSource == "NEOJPYSHORTS" ? "NEOJPY" : pairSource == "OMGBTC" ? "OMGBTC" : pairSource == "OMGBTCLONGS" ? "OMGBTC" : pairSource == "OMGBTCSHORTS" ? "OMGBTC" : pairSource == "OMGETH" ? "OMGETH" : pairSource == "OMGETHLONGS" ? "OMGETH" : pairSource == "OMGETHSHORTS" ? "OMGETH" : pairSource == "OMGUSD" ? "OMGUSD" : pairSource == "OMGUSDLONGS" ? "OMGUSD" : pairSource == "OMGUSDSHORTS" ? "OMGUSD" : pairSource == "SANBTC" ? "SANBTC" : pairSource == "SANBTCLONGS" ? "SANBTC" : pairSource == "SANBTCSHORTS" ? "SANBTC" : pairSource == "SANETH" ? "SANETH" : pairSource == "SANETHLONGS" ? "SANETH" : pairSource == "SANETHSHORTS" ? "SANETH" : pairSource == "SANUSD" ? "SANUSD" : pairSource == "SANUSDLONGS" ? "SANUSD" : pairSource == "SANUSDSHORTS" ? "SANUSD" : pairSource == "XMRBTC" ? "XMRBTC" : pairSource == "XMRBTCLONGS" ? "XMRBTC" : pairSource == "XMRBTCSHORTS" ? "XMRBTC" : pairSource == "XMRUSD" ? "XMRUSD" : pairSource == "XMRUSDLONGS" ? "XMRUSD" : pairSource == "XMRUSDSHORTS" ? "XMRUSD" : pairSource == "XRPBTC" ? "XRPBTC" : pairSource == "XRPBTCLONGS" ? "XRPBTC" : pairSource == "XRPBTCSHORTS" ? "XRPBTC" : pairSource == "XRPUSD" ? "XRPUSD" : pairSource == "XRPUSDLONGS" ? "XRPUSD" : pairSource == "XRPUSDSHORTS" ? "XRPUSD" : pairSource == "ZECBTC" ? "ZECBTC" : pairSource == "ZECBTCLONGS" ? "ZECBTC" : pairSource == "ZECBTCSHORTS" ? "ZECBTC" : pairSource == "ZECUSD" ? "ZECUSD" : pairSource == "ZECUSDLONGS" ? "ZECUSD" : pairSource == "ZECUSDSHORTS" ? "ZECUSD" : "NA"
+base = getBase(pair)
 
 //
 // The denominating logic is awkward because the security function is busted and won't work with a value that uses ticker in certain ways, such as the following:
@@ -231,26 +268,17 @@ getMarginData (pair) => [ getBfxClose(pair + "LONGS"), getBfxClose(pair + "SHORT
 //
 // The workaround is to put the offending logic into a function and derive the argument for security from that function.
 // Also, pine seems determined to evaluate and execute the security function, even if I only conditionally call it and the condition is not met.
-// I use plceholderTicker just so that unwanted security call will  work rather than crash the indicator.
 //
 
+denomination = denominationSelected == "*in Base" ? "NA" : denominationSelected == "in BTC" ? "BTC" : denominationSelected == "in USD" ? "USD" : "NA"
 getDenominationTicker (targetDenomination, currentDenomination) =>
-    placeholderTicker = "BTCUSD"
     denominationTicker = currentDenomination + targetDenomination
     targetDenomination == "NA" ? placeholderTicker : denominationTicker
+denominationModifier = getBfxClose(getDenominationTicker(denomination, base))
+denominate (value) => denomination == "NA" ? value : (value * denominationModifier)
 
-denominate (targetDenomination, currentDenomination, value) =>
-    targetDenomination == "NA" ? value : (value * getBfxClose(getDenominationTicker(targetDenomination, currentDenomination)))
-
-
-//----- VALUES
-
-pairSource = pairSelected == "*This Pair" ? ticker : pairSelected
-pair = pairSource == "BCHBTC" ? "BCHBTC" : pairSource == "BCHBTCLONGS" ? "BCHBTC" : pairSource == "BCHBTCSHORTS" ? "BCHBTC" : pairSource == "BCHETH" ? "BCHETH" : pairSource == "BCHETHLONGS" ? "BCHETH" : pairSource == "BCHETHSHORTS" ? "BCHETH" : pairSource == "BCHUSD" ? "BCHUSD" : pairSource == "BCHUSDLONGS" ? "BCHUSD" : pairSource == "BCHUSDSHORTS" ? "BCHUSD" : pairSource == "BTCUSD" ? "BTCUSD" : pairSource == "BTCUSDLONGS" ? "BTCUSD" : pairSource == "BTCUSDSHORTS" ? "BTCUSD" : pairSource == "XBTUSD" ? "BTCUSD" : pairSource == "BTCEUR" ? "BTCEUR" : pairSource == "BTCEURLONGS" ? "BTCEUR" : pairSource == "BTCEURSHORTS" ? "BTCEUR" : pairSource == "XBTEUR" ? "BTCEUR" : pairSource == "BTCGBP" ? "BTCGBP" : pairSource == "BTCGBPLONGS" ? "BTCGBP" : pairSource == "BTCGBPSHORTS" ? "BTCGBP" : pairSource == "XBTGBP" ? "BTCGBP" : pairSource == "BTCJPY" ? "BTCJPY" : pairSource == "BTCJPYLONGS" ? "BTCJPY" : pairSource == "BTCJPYSHORTS" ? "BTCJPY" : pairSource == "XBTJPY" ? "BTCJPY" : pairSource == "BTGBTC" ? "BTGBTC" : pairSource == "BTGBTCLONGS" ? "BTGBTC" : pairSource == "BTGBTCSHORTS" ? "BTGBTC" : pairSource == "BTGUSD" ? "BTGUSD" : pairSource == "BTGUSDLONGS" ? "BTGUSD" : pairSource == "BTGUSDSHORTS" ? "BTGUSD" : pairSource == "DSHBTC" ? "DSHBTC" : pairSource == "DSHBTCLONGS" ? "DSHBTC" : pairSource == "DSHBTCSHORTS" ? "DSHBTC" : pairSource == "DASHBTC" ? "DSHBTC" : pairSource == "DSHUSD" ? "DSHUSD" : pairSource == "DSHUSDLONGS" ? "DSHUSD" : pairSource == "DSHUSDSHORTS" ? "DSHUSD" : pairSource == "DASHUSD" ? "DSHUSD" : pairSource == "EDOBTC" ? "EDOBTC" : pairSource == "EDOBTCLONGS" ? "EDOBTC" : pairSource == "EDOBTCSHORTS" ? "EDOBTC" : pairSource == "EDOETH" ? "EDOETH" : pairSource == "EDOETHLONGS" ? "EDOETH" : pairSource == "EDOETHSHORTS" ? "EDOETH" : pairSource == "EDOUSD" ? "EDOUSD" : pairSource == "EDOUSDLONGS" ? "EDOUSD" : pairSource == "EDOUSDSHORTS" ? "EDOUSD" : pairSource == "EOSBTC" ? "EOSBTC" : pairSource == "EOSBTCLONGS" ? "EOSBTC" : pairSource == "EOSBTCSHORTS" ? "EOSBTC" : pairSource == "EOSETH" ? "EOSETH" : pairSource == "EOSETHLONGS" ? "EOSETH" : pairSource == "EOSETHSHORTS" ? "EOSETH" : pairSource == "EOSUSD" ? "EOSUSD" : pairSource == "EOSUSDLONGS" ? "EOSUSD" : pairSource == "EOSUSDSHORTS" ? "EOSUSD" : pairSource == "EOSEUR" ? "EOSEUR" : pairSource == "EOSEURLONGS" ? "EOSEUR" : pairSource == "EOSEURSHORTS" ? "EOSEUR" : pairSource == "EOSGBP" ? "EOSGBP" : pairSource == "EOSGBPLONGS" ? "EOSGBP" : pairSource == "EOSGBPSHORTS" ? "EOSGBP" : pairSource == "EOSJPY" ? "EOSJPY" : pairSource == "EOSJPYLONGS" ? "EOSJPY" : pairSource == "EOSJPYSHORTS" ? "EOSJPY" : pairSource == "ETCBTC" ? "ETCBTC" : pairSource == "ETCBTCLONGS" ? "ETCBTC" : pairSource == "ETCBTCSHORTS" ? "ETCBTC" : pairSource == "ETCUSD" ? "ETCUSD" : pairSource == "ETCUSDLONGS" ? "ETCUSD" : pairSource == "ETCUSDSHORTS" ? "ETCUSD" : pairSource == "ETHBTC" ? "ETHBTC" : pairSource == "ETHBTCLONGS" ? "ETHBTC" : pairSource == "ETHBTCSHORTS" ? "ETHBTC" : pairSource == "ETHUSD" ? "ETHUSD" : pairSource == "ETHUSDLONGS" ? "ETHUSD" : pairSource == "ETHUSDSHORTS" ? "ETHUSD" : pairSource == "ETHEUR" ? "ETHEUR" : pairSource == "ETHEURLONGS" ? "ETHEUR" : pairSource == "ETHEURSHORTS" ? "ETHEUR" : pairSource == "ETHGBP" ? "ETHGBP" : pairSource == "ETHGBPLONGS" ? "ETHGBP" : pairSource == "ETHGBPSHORTS" ? "ETHGBP" : pairSource == "ETHJPY" ? "ETHJPY" : pairSource == "ETHJPYLONGS" ? "ETHJPY" : pairSource == "ETHJPYSHORTS" ? "ETHJPY" : pairSource == "ETPBTC" ? "ETPBTC" : pairSource == "ETPBTCLONGS" ? "ETPBTC" : pairSource == "ETPBTCSHORTS" ? "ETPBTC" : pairSource == "ETPETH" ? "ETPETH" : pairSource == "ETPETHLONGS" ? "ETPETH" : pairSource == "ETPETHSHORTS" ? "ETPETH" : pairSource == "ETPUSD" ? "ETPUSD" : pairSource == "ETPUSDLONGS" ? "ETPUSD" : pairSource == "ETPUSDSHORTS" ? "ETPUSD" : pairSource == "IOTBTC" ? "IOTBTC" : pairSource == "IOTBTCLONGS" ? "IOTBTC" : pairSource == "IOTBTCSHORTS" ? "IOTBTC" : pairSource == "IOTABTC" ? "IOTBTC" : pairSource == "IOTETH" ? "IOTETH" : pairSource == "IOTETHLONGS" ? "IOTETH" : pairSource == "IOTETHSHORTS" ? "IOTETH" : pairSource == "IOTAETH" ? "IOTETH" : pairSource == "IOTUSD" ? "IOTUSD" : pairSource == "IOTUSDLONGS" ? "IOTUSD" : pairSource == "IOTUSDSHORTS" ? "IOTUSD" : pairSource == "IOTAUSD" ? "IOTUSD" : pairSource == "IOTEUR" ? "IOTEUR" : pairSource == "IOTEURLONGS" ? "IOTEUR" : pairSource == "IOTEURSHORTS" ? "IOTEUR" : pairSource == "IOTAEUR" ? "IOTEUR" : pairSource == "IOTGBP" ? "IOTGBP" : pairSource == "IOTGBPLONGS" ? "IOTGBP" : pairSource == "IOTGBPSHORTS" ? "IOTGBP" : pairSource == "IOTAGBP" ? "IOTGBP" : pairSource == "IOTJPY" ? "IOTJPY" : pairSource == "IOTJPYLONGS" ? "IOTJPY" : pairSource == "IOTJPYSHORTS" ? "IOTJPY" : pairSource == "IOTAJPY" ? "IOTJPY" : pairSource == "LTCBTC" ? "LTCBTC" : pairSource == "LTCBTCLONGS" ? "LTCBTC" : pairSource == "LTCBTCSHORTS" ? "LTCBTC" : pairSource == "LTCUSD" ? "LTCUSD" : pairSource == "LTCUSDLONGS" ? "LTCUSD" : pairSource == "LTCUSDSHORTS" ? "LTCUSD" : pairSource == "NEOBTC" ? "NEOBTC" : pairSource == "NEOBTCLONGS" ? "NEOBTC" : pairSource == "NEOBTCSHORTS" ? "NEOBTC" : pairSource == "NEOETH" ? "NEOETH" : pairSource == "NEOETHLONGS" ? "NEOETH" : pairSource == "NEOETHSHORTS" ? "NEOETH" : pairSource == "NEOUSD" ? "NEOUSD" : pairSource == "NEOUSDLONGS" ? "NEOUSD" : pairSource == "NEOUSDSHORTS" ? "NEOUSD" : pairSource == "NEOEUR" ? "NEOEUR" : pairSource == "NEOEURLONGS" ? "NEOEUR" : pairSource == "NEOEURSHORTS" ? "NEOEUR" : pairSource == "NEOGBP" ? "NEOGBP" : pairSource == "NEOGBPLONGS" ? "NEOGBP" : pairSource == "NEOGBPSHORTS" ? "NEOGBP" : pairSource == "NEOJPY" ? "NEOJPY" : pairSource == "NEOJPYLONGS" ? "NEOJPY" : pairSource == "NEOJPYSHORTS" ? "NEOJPY" : pairSource == "OMGBTC" ? "OMGBTC" : pairSource == "OMGBTCLONGS" ? "OMGBTC" : pairSource == "OMGBTCSHORTS" ? "OMGBTC" : pairSource == "OMGETH" ? "OMGETH" : pairSource == "OMGETHLONGS" ? "OMGETH" : pairSource == "OMGETHSHORTS" ? "OMGETH" : pairSource == "OMGUSD" ? "OMGUSD" : pairSource == "OMGUSDLONGS" ? "OMGUSD" : pairSource == "OMGUSDSHORTS" ? "OMGUSD" : pairSource == "SANBTC" ? "SANBTC" : pairSource == "SANBTCLONGS" ? "SANBTC" : pairSource == "SANBTCSHORTS" ? "SANBTC" : pairSource == "SANETH" ? "SANETH" : pairSource == "SANETHLONGS" ? "SANETH" : pairSource == "SANETHSHORTS" ? "SANETH" : pairSource == "SANUSD" ? "SANUSD" : pairSource == "SANUSDLONGS" ? "SANUSD" : pairSource == "SANUSDSHORTS" ? "SANUSD" : pairSource == "XMRBTC" ? "XMRBTC" : pairSource == "XMRBTCLONGS" ? "XMRBTC" : pairSource == "XMRBTCSHORTS" ? "XMRBTC" : pairSource == "XMRUSD" ? "XMRUSD" : pairSource == "XMRUSDLONGS" ? "XMRUSD" : pairSource == "XMRUSDSHORTS" ? "XMRUSD" : pairSource == "XRPBTC" ? "XRPBTC" : pairSource == "XRPBTCLONGS" ? "XRPBTC" : pairSource == "XRPBTCSHORTS" ? "XRPBTC" : pairSource == "XRPUSD" ? "XRPUSD" : pairSource == "XRPUSDLONGS" ? "XRPUSD" : pairSource == "XRPUSDSHORTS" ? "XRPUSD" : pairSource == "ZECBTC" ? "ZECBTC" : pairSource == "ZECBTCLONGS" ? "ZECBTC" : pairSource == "ZECBTCSHORTS" ? "ZECBTC" : pairSource == "ZECUSD" ? "ZECUSD" : pairSource == "ZECUSDLONGS" ? "ZECUSD" : pairSource == "ZECUSDSHORTS" ? "ZECUSD" : "NA"
-base = getBase(pair)
-denomination = denominationSelected == "*Base" ? "NA" : denominationSelected
-
-[ longs_cumulative, shorts_cumulative ] = getMarginData(pair)
+longs_cumulative = aggregateMatchingBase ? getAggregatedLongsDataMatchingBase(base) : getLongsData(pair)
+shorts_cumulative = aggregateMatchingBase ? getAggregatedShortsDataMatchingBase(base) : getShortsData(pair)
 
 openInterest_cumulative = longs_cumulative + shorts_cumulative
 longs_net_cumulative = longs_cumulative - shorts_cumulative
@@ -305,13 +333,13 @@ renderOpenInterest = dataType == DATA_TYPE_OPEN_INTEREST
 renderSells = (dataType == DATA_TYPE_SELLS) or (dataType == DATA_TYPE_BUYS_SELLS)
 renderShorts = (dataType == DATA_TYPE_SHORTS) or (dataType == DATA_TYPE_LONGS_SHORTS)
 
-buysRenderValue = chooseDataByFormat(dataFormat, buys_cumulative, buys_delta, buys_gain, -buys_loss)
-longsRenderValue = chooseDataByFormat(dataFormat, longs_cumulative, longs_delta, longs_gain, -longs_loss)
-longsNetRenderValue = chooseDataByFormat(dataFormat, longs_net_cumulative, longs_net_delta, longs_net_gain, -longs_net_loss)
 longsPercentRenderValue = chooseDataByFormat(dataFormat, longs_percent_cumulative, longs_percent_delta, longs_percent_gain, -longs_percent_loss)
-openInterestRenderValue = chooseDataByFormat(dataFormat, openInterest_cumulative, openInterest_delta, openInterest_gain, -openInterest_loss)
-sellsRenderValue = chooseDataByFormat(dataFormat, sells_cumulative, sells_delta, sells_gain, -sells_loss)
-shortsRenderValue = chooseDataByFormat(dataFormat, shorts_cumulative, shorts_delta, shorts_gain, -shorts_loss)
+longsNetRenderValue = denominate(chooseDataByFormat(dataFormat, longs_net_cumulative, longs_net_delta, longs_net_gain, -longs_net_loss))
+longsRenderValue = denominate(chooseDataByFormat(dataFormat, longs_cumulative, longs_delta, longs_gain, -longs_loss))
+shortsRenderValue = denominate(chooseDataByFormat(dataFormat, shorts_cumulative, shorts_delta, shorts_gain, -shorts_loss))
+openInterestRenderValue = denominate(chooseDataByFormat(dataFormat, openInterest_cumulative, openInterest_delta, openInterest_gain, -openInterest_loss))
+buysRenderValue = denominate(chooseDataByFormat(dataFormat, buys_cumulative, buys_delta, buys_gain, -buys_loss))
+sellsRenderValue = denominate(chooseDataByFormat(dataFormat, sells_cumulative, sells_delta, sells_gain, -sells_loss))
 
 renderValue1 = renderBuys
    ? buysRenderValue
@@ -331,9 +359,6 @@ renderValue2 = renderSells
      ? shortsRenderValue
      : na)
 
-renderValue1 := denominate(denomination, base, renderValue1)
-renderValue2 := denominate(denomination, base, renderValue2)
-
 longsColor = #53B987
 shortsColor = #EB4D5C
 openInterestColor = #247BA0
@@ -352,16 +377,16 @@ plot(renderValue1, title="Rendered Value 1", color=renderColor1)
 plot(renderValue2, title="Rendered Value 2", color=renderColor2)
 plot(renderZeroLine ? 0 : na, title="Zero Line", style=circles, color=renderZeroLine ? color(black, 50) : white)
 
-plotshape(longs_cumulative, title="Longs {Print}", location=location.top, color=longsColor, transp=100)
-plotshape(longs_net_cumulative, title="Longs (Net) {Print}", location=location.top, color=longsColor, transp=100)
 plotshape(longs_percent_cumulative, title="Longs (Percent) {Print}", location=location.top, color=longsColor, transp=100)
-plotshape(shorts_cumulative, title="Shorts {Print}", location=location.top, color=shortsColor, transp=100)
-plotshape(openInterest_cumulative, title="Open Interest {Print}", location=location.top, color=openInterestColor, transp=100)
+plotshape(denominate(longs_net_cumulative), title="Longs (Net) {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(denominate(longs_cumulative), title="Longs {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(denominate(shorts_cumulative), title="Shorts {Print}", location=location.top, color=shortsColor, transp=100)
+plotshape(denominate(openInterest_cumulative), title="Open Interest {Print}", location=location.top, color=openInterestColor, transp=100)
 
 plotshape(0, title="Divider {Print}", location=location.top, color=white, transp=100)
 
-plotshape(longsPrintDelta, title="Longs Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
-plotshape(longsNetPrintDelta, title="Longs (Net) Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
 plotshape(longsPercentPrintDelta, title="Longs (Percent) Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
-plotshape(shortsPrintDelta, title="Shorts Lookback Delta {Print}", location=location.top, color=shortsColor, transp=100)
-plotshape(openInterestPrintDelta, title="Open Interest Lookback Delta {Print}", location=location.top, color=openInterestColor, transp=100)
+plotshape(denominate(longsNetPrintDelta), title="Longs (Net) Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(denominate(longsPrintDelta), title="Longs Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(denominate(shortsPrintDelta), title="Shorts Lookback Delta {Print}", location=location.top, color=shortsColor, transp=100)
+plotshape(denominate(openInterestPrintDelta), title="Open Interest Lookback Delta {Print}", location=location.top, color=openInterestColor, transp=100)

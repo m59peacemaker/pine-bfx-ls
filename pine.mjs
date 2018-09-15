@@ -15,10 +15,10 @@ const listItem = value => typeof value == "string"
 
 const list = array => `[ ${array.map(listItem).join(', ')} ]`
 
-const lookup = (variable, map, lookupFn = identity, defaultValue) => Object
+const lookup = (pineVariableName, map, lookupFn = identity, defaultValue) => Object
   .keys(map)
   .reduce(
-    (acc, key) => `${acc}${variable} == ${string(key)} ? ${lookupFn(map[key], key, map)} : `,
+    (acc, key) => `${acc}${pineVariableName} == ${string(key)} ? ${lookupFn(map[key], key, map)} : `,
     ''
   ) + defaultValue
 
@@ -27,11 +27,20 @@ const reduce = (pineReducerFunctionName, initialValue, array) => array.reduce(
   initialValue
 )
 
+const includes = (pineVariableName, array) => {
+  const condition = array
+    .map(value => `${pineVariableName} == ${value}`)
+    .join(' or ')
+  return `(${condition})`
+}
+
+
 export {
   comment,
   string,
   listItem,
   list,
   lookup,
-  reduce
+  reduce,
+  includes
 }

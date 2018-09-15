@@ -19,18 +19,57 @@ const baseAliasMap = {
 
 const constants = {
   PAIRS_THIS: '*This Pair',
-  DENOMINATIONS_BASE: '*Base'
+  DENOMINATIONS_BASE: '*in Base'
 }
 
 const pairs = fs.readFileSync(`${__dirname}/pairs`, 'utf8')
   .split(EOL)
   .filter(v => v.length)
 
-const supportedTickersMap = pairs
-  .map(pair => ({ pair, base: pair.slice(0, 3), quote: pair.slice(3) }))
+const parsedPairs = pairs.map(pair => ({ pair, base: pair.slice(0, 3), quote: pair.slice(3) }))
+
+const baseMap = parsedPairs
   .reduce(
     (map, { pair, base, quote }) => {
-      const parsedPair = { pair, base, quote }
+      map[base] = map[base] || { pairs: [], quotes: [] }
+      map[base].pairs.push(pair)
+      map[base].quotes.push(quote)
+      return map
+    },
+    {}
+  )
+
+const quoteMap = parsedPairs
+  .reduce(
+    (map, { pair, base, quote }) => {
+      map[quote] = map[quote] || { pairs: [], bases: [] }
+      map[quote].pairs.push(pair)
+      map[quote].bases.push(base)
+      return map
+    },
+    {}
+  )
+
+const getDataOfQuoteFunctionMap = Object
+  .keys(quoteMap)
+  .reduce(
+    (acc, quote) => {
+      const items = [ 'Longs', 'Shorts' ]
+        .map(dataType => ({
+          fnName: `get${dataType}Data_quote_${quote}`,
+          dataType,
+          quote,
+          bases: quoteMap[quote].bases
+        }))
+      return [ ...acc, ...items ]
+    },
+    []
+  )
+
+const supportedTickersMap = parsedPairs
+  .reduce(
+    (map, parsedPair) => {
+      const { pair, base, quote } = parsedPair
       map[pair] = parsedPair
       map[pair + 'LONGS'] = parsedPair
       map[pair + 'SHORTS'] = parsedPair
@@ -44,7 +83,10 @@ const supportedTickersMap = pairs
 
 const pairOptions = [ constants.PAIRS_THIS, ...pairs ]
 
-const denominationOptions = [ constants.DENOMINATIONS_BASE, ...denominations ]
+const denominationOptions = [
+  { title: constants.DENOMINATIONS_BASE, value: 'NA' },
+  ...denominations.map(denomination => ({ title: `in ${denomination}`, value: denomination}))
+].reduce((acc, { title, value }) => Object.assign(acc, { [title]: { title, value } }), {})
 
 const script = `
 //@version=3
@@ -77,14 +119,14 @@ Rendered Value 1 | Rendered Value 2 | Zero Line
 
 CUMULATIVE VALUES
 
-Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
+Longs (Percent) | Longs (Net) | Longs | Shorts | Open Interest
 
 
 LOOKBACK DELTA VALUES
 The last set of printed values is the differences of the cumulative value of the printed data types from the values a number of bars ago.
 See the "Print Delta Lookback Length" option.
 
-Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
+Longs (Percent) | Longs (Net) | Longs | Shorts | Open Interest
 
 
 ----- OPTIONS
@@ -120,13 +162,15 @@ Longs | Longs (Net) | Longs (Percent) | Shorts | Open Interest
 - Pair: The pair for which to get margin data.
   - This Pair: Use the pair of the current chart
 
+- Aggregate Data: Use additional L/S data.
+  - Matching Base: Use L/S data that has the same base currency as the currently selected pair i.e. BTCUSD with Matching Base will also include BTCEUR, BTCGBP, and BTCJPY.
+
 - Denomination:
     The denomination by which the data is measured.
     This defaults to the base value.
     For example, if you're viewing the BTCUSD pair, BTC is the base, so by default, the data will be displayed as a measure of BTC.
     If there were 10,000 BTC of long positions, long positions will be represented as 10,000.
-    In that case, if you change the denomination to "USD", and BTCUSD is $6000 USD, long positions would be displayed as 60,000,000 (10,0000 * 6000).
-  - Base: Use the selected base value (default)
+    In that case, if you change the denomination to "in USD", and BTCUSD is $6000 USD, long positions would be displayed as 60,000,000 (10,0000 * 6000).
 
 - Print Delta Lookback Length:
     The change of all indicated values from the current bar number back to the "Lookback Length" bar number is calculated and printed.
@@ -148,6 +192,9 @@ ${pairs.join(EOL)}
 
 
 //----- INPUTS
+
+// I use placeholderTicker to prevent unused security calls from crashing the indicator.
+placeholderTicker = "BTCUSD"
 
 dataType = input(
    "Longs (Percent)",
@@ -185,10 +232,15 @@ pairSelected = input(
    title="Pair",
    options=${pine.list(pairOptions)})
 
+aggregateData = input(
+   "*",
+   title="Aggregate Data",
+   options=[ "*", "Matching Base" ])
+
 denominationSelected = input(
-   "${denominationOptions[0]}",
+   "${constants.DENOMINATIONS_BASE}",
    title="Denomination",
-   options=${pine.list(denominationOptions)})
+   options=${pine.list(Object.values(denominationOptions).map(option => option.title))})
 
 printDeltaLookbackLength = input(1, title="Print Delta Lookback Length")
 
@@ -214,7 +266,43 @@ getBase (pair) => ${pine.lookup('pair', supportedTickersMap, ticker => pine.stri
 
 getBfxClose (tkr) => security(tickerid("BITFINEX", tkr), period, close)
 
-getMarginData (pair) => [ getBfxClose(pair + "LONGS"), getBfxClose(pair + "SHORTS") ]
+getLongsData (pair) => getBfxClose(pair + "LONGS")
+getShortsData (pair) => getBfxClose(pair + "SHORTS")
+
+// Generate a function for each quote currency, which will return 0 if called with a base the quote does not support.
+// This gives me a sane starting point to ensure there are not too many calls to security in the script. The limit is 40.
+${getDataOfQuoteFunctionMap
+  .map(({ fnName, dataType, quote, bases }) => {
+    // generates a pine expression that will be true if the pine variable `base` has a value that is in the js `bases` array
+    // if the expression is true, that means we should get data for this base using this quote function
+    const supportedBaseCondition = pine.includes('base', bases.map(pine.string))
+    // if the pine expression is true, use the base + quote as the pair argument, otherwise use the placeholder
+    const pairArgument = `${supportedBaseCondition} ? base + ${pine.string(quote)} : placeholderTicker`
+    // if the pine expression is true, get the data for this pair, or return 0
+    // if the data is `na`, return 0 so that the result can be aggregated with the rest of the data
+    return `${fnName} (base) => ${supportedBaseCondition} ? nz(get${dataType}Data(${pairArgument}), 0) : 0`
+  })
+  .join(EOL)
+}
+
+getAggregatedLongsDataMatchingBase (base) => ${getDataOfQuoteFunctionMap
+  .filter(({ dataType }) => dataType == 'Longs')
+  .map(({ fnName }) => `${fnName}(base)`)
+  .join(' + ')
+}
+
+getAggregatedShortsDataMatchingBase (base) => ${getDataOfQuoteFunctionMap
+  .filter(({ dataType }) => dataType == 'Shorts')
+  .map(({ fnName }) => `${fnName}(base)`)
+  .join(' + ')
+}
+
+//----- VALUES
+
+aggregateMatchingBase = aggregateData == "Matching Base"
+pairSource = pairSelected == "${constants.PAIRS_THIS}" ? ticker : pairSelected
+pair = ${pine.lookup('pairSource', supportedTickersMap, ticker => pine.string(ticker.pair), pine.string('NA'))}
+base = getBase(pair)
 
 ${pine.comment(
 `
@@ -227,27 +315,18 @@ plot(x)
 
 The workaround is to put the offending logic into a function and derive the argument for security from that function.
 Also, pine seems determined to evaluate and execute the security function, even if I only conditionally call it and the condition is not met.
-I use plceholderTicker just so that unwanted security call will  work rather than crash the indicator.
 `
 )}
 
+denomination = ${pine.lookup('denominationSelected', denominationOptions, option => pine.string(option.value), pine.string('NA'))}
 getDenominationTicker (targetDenomination, currentDenomination) =>
-    placeholderTicker = "BTCUSD"
     denominationTicker = currentDenomination + targetDenomination
     targetDenomination == "NA" ? placeholderTicker : denominationTicker
+denominationModifier = getBfxClose(getDenominationTicker(denomination, base))
+denominate (value) => denomination == "NA" ? value : (value * denominationModifier)
 
-denominate (targetDenomination, currentDenomination, value) =>
-    targetDenomination == "NA" ? value : (value * getBfxClose(getDenominationTicker(targetDenomination, currentDenomination)))
-
-
-//----- VALUES
-
-pairSource = pairSelected == "${constants.PAIRS_THIS}" ? ticker : pairSelected
-pair = ${pine.lookup('pairSource', supportedTickersMap, ticker => pine.string(ticker.pair), pine.string('NA'))}
-base = getBase(pair)
-denomination = denominationSelected == "${constants.DENOMINATIONS_BASE}" ? "NA" : denominationSelected
-
-[ longs_cumulative, shorts_cumulative ] = getMarginData(pair)
+longs_cumulative = aggregateMatchingBase ? getAggregatedLongsDataMatchingBase(base) : getLongsData(pair)
+shorts_cumulative = aggregateMatchingBase ? getAggregatedShortsDataMatchingBase(base) : getShortsData(pair)
 
 openInterest_cumulative = longs_cumulative + shorts_cumulative
 longs_net_cumulative = longs_cumulative - shorts_cumulative
@@ -302,13 +381,13 @@ renderOpenInterest = dataType == DATA_TYPE_OPEN_INTEREST
 renderSells = (dataType == DATA_TYPE_SELLS) or (dataType == DATA_TYPE_BUYS_SELLS)
 renderShorts = (dataType == DATA_TYPE_SHORTS) or (dataType == DATA_TYPE_LONGS_SHORTS)
 
-buysRenderValue = chooseDataByFormat(dataFormat, buys_cumulative, buys_delta, buys_gain, -buys_loss)
-longsRenderValue = chooseDataByFormat(dataFormat, longs_cumulative, longs_delta, longs_gain, -longs_loss)
-longsNetRenderValue = chooseDataByFormat(dataFormat, longs_net_cumulative, longs_net_delta, longs_net_gain, -longs_net_loss)
 longsPercentRenderValue = chooseDataByFormat(dataFormat, longs_percent_cumulative, longs_percent_delta, longs_percent_gain, -longs_percent_loss)
-openInterestRenderValue = chooseDataByFormat(dataFormat, openInterest_cumulative, openInterest_delta, openInterest_gain, -openInterest_loss)
-sellsRenderValue = chooseDataByFormat(dataFormat, sells_cumulative, sells_delta, sells_gain, -sells_loss)
-shortsRenderValue = chooseDataByFormat(dataFormat, shorts_cumulative, shorts_delta, shorts_gain, -shorts_loss)
+longsNetRenderValue = denominate(chooseDataByFormat(dataFormat, longs_net_cumulative, longs_net_delta, longs_net_gain, -longs_net_loss))
+longsRenderValue = denominate(chooseDataByFormat(dataFormat, longs_cumulative, longs_delta, longs_gain, -longs_loss))
+shortsRenderValue = denominate(chooseDataByFormat(dataFormat, shorts_cumulative, shorts_delta, shorts_gain, -shorts_loss))
+openInterestRenderValue = denominate(chooseDataByFormat(dataFormat, openInterest_cumulative, openInterest_delta, openInterest_gain, -openInterest_loss))
+buysRenderValue = denominate(chooseDataByFormat(dataFormat, buys_cumulative, buys_delta, buys_gain, -buys_loss))
+sellsRenderValue = denominate(chooseDataByFormat(dataFormat, sells_cumulative, sells_delta, sells_gain, -sells_loss))
 
 renderValue1 = renderBuys
    ? buysRenderValue
@@ -328,9 +407,6 @@ renderValue2 = renderSells
      ? shortsRenderValue
      : na)
 
-renderValue1 := denominate(denomination, base, renderValue1)
-renderValue2 := denominate(denomination, base, renderValue2)
-
 longsColor = #53B987
 shortsColor = #EB4D5C
 openInterestColor = #247BA0
@@ -349,19 +425,19 @@ plot(renderValue1, title="Rendered Value 1", color=renderColor1)
 plot(renderValue2, title="Rendered Value 2", color=renderColor2)
 plot(renderZeroLine ? 0 : na, title="Zero Line", style=circles, color=renderZeroLine ? color(black, 50) : white)
 
-plotshape(longs_cumulative, title="Longs {Print}", location=location.top, color=longsColor, transp=100)
-plotshape(longs_net_cumulative, title="Longs (Net) {Print}", location=location.top, color=longsColor, transp=100)
 plotshape(longs_percent_cumulative, title="Longs (Percent) {Print}", location=location.top, color=longsColor, transp=100)
-plotshape(shorts_cumulative, title="Shorts {Print}", location=location.top, color=shortsColor, transp=100)
-plotshape(openInterest_cumulative, title="Open Interest {Print}", location=location.top, color=openInterestColor, transp=100)
+plotshape(denominate(longs_net_cumulative), title="Longs (Net) {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(denominate(longs_cumulative), title="Longs {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(denominate(shorts_cumulative), title="Shorts {Print}", location=location.top, color=shortsColor, transp=100)
+plotshape(denominate(openInterest_cumulative), title="Open Interest {Print}", location=location.top, color=openInterestColor, transp=100)
 
 plotshape(0, title="Divider {Print}", location=location.top, color=white, transp=100)
 
-plotshape(longsPrintDelta, title="Longs Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
-plotshape(longsNetPrintDelta, title="Longs (Net) Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
 plotshape(longsPercentPrintDelta, title="Longs (Percent) Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
-plotshape(shortsPrintDelta, title="Shorts Lookback Delta {Print}", location=location.top, color=shortsColor, transp=100)
-plotshape(openInterestPrintDelta, title="Open Interest Lookback Delta {Print}", location=location.top, color=openInterestColor, transp=100)
+plotshape(denominate(longsNetPrintDelta), title="Longs (Net) Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(denominate(longsPrintDelta), title="Longs Lookback Delta {Print}", location=location.top, color=longsColor, transp=100)
+plotshape(denominate(shortsPrintDelta), title="Shorts Lookback Delta {Print}", location=location.top, color=shortsColor, transp=100)
+plotshape(denominate(openInterestPrintDelta), title="Open Interest Lookback Delta {Print}", location=location.top, color=openInterestColor, transp=100)
 `
 
 process.stdout.write(script)
