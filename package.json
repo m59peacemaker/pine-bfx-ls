@@ -1,7 +1,7 @@
 {
   "name": "bfx-ls",
   "private": true,
-  "version": "5.0.0",
+  "version": "7.0.0",
   "main": "index.js",
   "scripts": {
     "build": "mkdir -p dist && ./generate-bfx-ls.mjs > dist/bfx-ls.pine",
